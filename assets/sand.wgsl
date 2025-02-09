@@ -10,7 +10,7 @@ struct VertexOutput {
 };
 
 @vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
+fn vertex(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
     output.uv = input.position;
     output.position = vec4f(input.position, 0.0, 1.0);
@@ -83,7 +83,7 @@ fn fragment(@location(0) uv: vec2<f32>) -> @location(0) vec4f {// 修改text_coo
 
    let text_coord = vec2f(
       (uv.x + 1.0) * 0.5,
-              1.0 - (uv.y + 1.0) * 0.5 // Y轴翻转
+              (uv.y + 1.0) * 0.5 // Y轴翻转
    );
     // 精确采样
     let tex_size = textureDimensions(data_tex);

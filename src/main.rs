@@ -143,24 +143,24 @@ struct Rotating {
 impl Material2d for CellMaterial {
 
 
-    fn specialize(
-        descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayout,
-        key: Material2dKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        descriptor.vertex.entry_point = "vs_main".into();
-        if let Some(fragment) = &mut descriptor.fragment {
-            fragment.entry_point = "fragment".into();
-        }
-        // descriptor.depth_stencil = Some(DepthStencilState {
-        //     format: TextureFormat::Depth32Float,
-        //     depth_write_enabled: false,
-        //     depth_compare: CompareFunction::Always,
-        //     stencil: Default::default(),
-        //     bias: Default::default(),
-        // });
-        Ok(())
-    }
+    // fn specialize(
+    //     descriptor: &mut RenderPipelineDescriptor,
+    //     layout: &MeshVertexBufferLayout,
+    //     key: Material2dKey<Self>,
+    // ) -> Result<(), SpecializedMeshPipelineError> {
+    //     descriptor.vertex.entry_point = "vs_main".into();
+    //     if let Some(fragment) = &mut descriptor.fragment {
+    //         fragment.entry_point = "fragment".into();
+    //     }
+    //     // descriptor.depth_stencil = Some(DepthStencilState {
+    //     //     format: TextureFormat::Depth32Float,
+    //     //     depth_write_enabled: false,
+    //     //     depth_compare: CompareFunction::Always,
+    //     //     stencil: Default::default(),
+    //     //     bias: Default::default(),
+    //     // });
+    //     Ok(())
+    // }
 
     fn fragment_shader() -> ShaderRef {
         "sand.wgsl".into()
@@ -279,13 +279,13 @@ fn setup(
     );
     image.sampler = ImageSampler::nearest();
 
-    image.texture_descriptor.usage =
-         TextureUsages::COPY_SRC |
-            TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING |
-    TextureUsages::COPY_DST;
-    // image.texture_descriptor.usage=TextureUsages::TEXTURE_BINDING
-    //     | TextureUsages::COPY_DST
-    //     | TextureUsages::RENDER_ATTACHMENT;
+    // image.texture_descriptor.usage =
+    //      TextureUsages::COPY_SRC |
+    //         TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING |
+    // TextureUsages::COPY_DST;
+    image.texture_descriptor.usage=TextureUsages::TEXTURE_BINDING
+        | TextureUsages::COPY_DST;
+        // | TextureUsages::RENDER_ATTACHMENT;
     let data_tex_handle = images.add(image); // 强引用在此处创建
 
     // 创建材质
@@ -369,7 +369,7 @@ fn update_texture_data(
                         // let center_x = grid.width / 2;
                         // let center_y = grid.height / 2;
                         // let idx = (center_y * grid.width + center_x) * 4;
-                        println!("Center pixel: {:?}:cell: {:?}", &pixels[idx], cell);
+                        // println!("Center pixel: {:?}:cell: {:?}", &pixels[idx], cell);
                     }
                 }
                 // let data_layout = ImageDataLayout {
@@ -414,7 +414,7 @@ fn handle_input(
                     rb: 0,
                     clock: 0,
                 };
-                println!("Set Fire at ({}, {})", x, y); // 调试输出
+                // println!("Set Fire at ({}, {})", x, y); // 调试输出
             }
         }
 
