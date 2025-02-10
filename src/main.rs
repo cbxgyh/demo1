@@ -194,6 +194,7 @@ fn main() {
             Material2dPlugin::<CellMaterial>::default(),
         ))
         .insert_resource(CellGrid::new(768, 768))
+        .init_resource::<LastMousePos>()
         .add_systems(Startup, setup)
         .insert_resource(Falg(0))
         // .add_systems(Render,update_texture_data)
@@ -390,23 +391,60 @@ fn update_texture_data(
         }
     }
 }
+#[derive(Resource, Default)]
+struct LastMousePos(Option<Vec2>);
 
 fn handle_input(
     mut grid: ResMut<CellGrid>,
     windows: Query<&Window>,
     buttons: Res<ButtonInput<MouseButton>>,
-    mut images: ResMut<Assets<Image>>,
-    mut falg: ResMut<Falg>
+    mut last_pos: ResMut<LastMousePos>,
 ) {
     let window = windows.single();
-    if let Some(pos) = window.cursor_position() {
-        let x = (pos.x / window.width() * grid.width as f32) as usize;
-        let x = x.min(grid.width - 1);
 
-        let y = grid.height - 1 - (pos.y / window.height() * grid.height as f32) as usize;
-        let y = y.min(grid.height - 1);
+    // 获取当前鼠标位置
+    let current_pos = if let Some(pos) = window.cursor_position() {
+        pos
+    } else {
+        last_pos.0 = None;
+        return;
+    };
 
-        if buttons.pressed(MouseButton::Left) {
+    // 转换坐标为网格坐标
+
+
+    if buttons.pressed(MouseButton::Left) {
+        let to_grid_pos = |pos: Vec2| -> (usize, usize) {
+            let x = (pos.x / window.width() * grid.width as f32) as usize;
+            let y = grid.height - 1 - (pos.y / window.height() * grid.height as f32) as usize;
+            (x.clamp(0, grid.width-1), y.clamp(0, grid.height-1))
+        };
+        // 如果有上一帧位置，进行插值
+        if let Some(last) = last_pos.0 {
+            // 计算两点间距离
+            let current_grid = to_grid_pos(current_pos);
+            let last_grid = to_grid_pos(last);
+
+            // 使用 Bresenham 算法绘制连续线段
+            for (x, y) in line_drawing::Bresenham::new(
+                (last_grid.0 as i32, last_grid.1 as i32),
+                (current_grid.0 as i32, current_grid.1 as i32)
+            ) {
+                let x = x.clamp(0, grid.width as i32 - 1) as usize;
+                let y = y.clamp(0, grid.height as i32 - 1) as usize;
+
+                if let Some(cell) = grid.get_mut(x, y) {
+                    *cell = Cell {
+                        species: Species::Fire,
+                        ra: 0,
+                        rb: 0,
+                        clock: 0,
+                    };
+                }
+            }
+        }else{
+            // 绘制当前点
+            let (x, y) = to_grid_pos(current_pos);
             if let Some(cell) = grid.get_mut(x, y) {
                 *cell = Cell {
                     species: Species::Fire,
@@ -414,14 +452,13 @@ fn handle_input(
                     rb: 0,
                     clock: 0,
                 };
-                // println!("Set Fire at ({}, {})", x, y); // 调试输出
             }
         }
-
-
     }
-}
 
+    // 更新上一帧位置
+    last_pos.0 = Some(current_pos);
+}
 
 // 移除原有的render_cells系统，修改handle_input和update_simulation保持不变...
 fn swap_cells(grid: &mut CellGrid, x1: usize, y1: usize, x2: usize, y2: usize) {
