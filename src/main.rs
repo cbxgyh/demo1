@@ -1,3 +1,5 @@
+mod test;
+
 use bevy::{
     prelude::*,
     render::{
@@ -84,16 +86,6 @@ impl CellGrid {
                 });
             }
         };
-        // cells.resize_with(width * height, || {
-        //
-        //     Cell {
-        //
-        //         species: Species::Water,
-        //         ra: 0,
-        //         rb: 0,
-        //         clock: 0,
-        //     }
-        // });
 
         Self { width, height, cells }
     }
@@ -143,24 +135,7 @@ struct Rotating {
 impl Material2d for CellMaterial {
 
 
-    // fn specialize(
-    //     descriptor: &mut RenderPipelineDescriptor,
-    //     layout: &MeshVertexBufferLayout,
-    //     key: Material2dKey<Self>,
-    // ) -> Result<(), SpecializedMeshPipelineError> {
-    //     descriptor.vertex.entry_point = "vs_main".into();
-    //     if let Some(fragment) = &mut descriptor.fragment {
-    //         fragment.entry_point = "fragment".into();
-    //     }
-    //     // descriptor.depth_stencil = Some(DepthStencilState {
-    //     //     format: TextureFormat::Depth32Float,
-    //     //     depth_write_enabled: false,
-    //     //     depth_compare: CompareFunction::Always,
-    //     //     stencil: Default::default(),
-    //     //     bias: Default::default(),
-    //     // });
-    //     Ok(())
-    // }
+
 
     fn fragment_shader() -> ShaderRef {
         "sand.wgsl".into()
@@ -435,7 +410,7 @@ fn handle_input(
 
                 if let Some(cell) = grid.get_mut(x, y) {
                     *cell = Cell {
-                        species: Species::Fire,
+                        species: Species::Water,
                         ra: 0,
                         rb: 0,
                         clock: 0,
@@ -447,7 +422,7 @@ fn handle_input(
             let (x, y) = to_grid_pos(current_pos);
             if let Some(cell) = grid.get_mut(x, y) {
                 *cell = Cell {
-                    species: Species::Fire,
+                    species: Species::Water,
                     ra: 0,
                     rb: 0,
                     clock: 0,
