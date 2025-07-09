@@ -96,7 +96,7 @@ fn fragment(@location(0) uv: vec2<f32>) -> @location(0) vec4f {// 修改text_coo
     var hue: f32 = 0.0;
     var saturation: f32 = 0.6;
     var lightness: f32 = 0.3 + data.g * 0.5;
-    var a: f32 = 1.0;
+    var a: f32 = 0.6;
 
     // 计算公共噪声值
     let pixel_pos = floor(uv * params.resolution / params.dpi);
@@ -226,7 +226,7 @@ fn fragment(@location(0) uv: vec2<f32>) -> @location(0) vec4f {// 修改text_coo
     if (params.is_snapshot == 0u) {
         lightness *= 0.975 + noise2 * 0.025;
     }
-
+    a = 0.7;
     let hsv = vec3f(hue, saturation, lightness);
     return vec4f(hsv2rgb(hsv), a);
 }

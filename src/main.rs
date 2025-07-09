@@ -7,6 +7,7 @@ mod vorticity;
 mod velocity_out;
 mod fluid;
 mod display;
+mod compute_shader_game_of_life;
 
 use bevy::{
     prelude::*,
@@ -31,6 +32,7 @@ use bevy::utils::petgraph::visit::NodeRef;
 use bevy::window::PrimaryWindow;
 use rand::seq::SliceRandom;
 use crate::advection::{AdvectionBindGroup, AdvectionImage, AdvectionPipeline, AdvectionPlugin};
+use crate::compute_shader_game_of_life::{GameOfLifeComputePlugin, GameOfLifeImage};
 use crate::curl::{CurlBindGroup, CurlImage, CurlPipeline, CurlPlugin};
 use crate::divergence::{DivergenceImage, DivergencePlugin};
 use crate::gradient_subtract::{GradientSubtractBindGroup, GradientSubtractImage, GradientSubtractPipeline, GradientSubtractPlugin};
@@ -38,8 +40,8 @@ use crate::pressure::{PressureBindGroup, PressureImage, PressurePipeline, Pressu
 use crate::velocity_out::{VelocityOutBindGroup, VelocityOutImage, VelocityOutPipeline, VelocityOutPlugin};
 use crate::vorticity::{VorticityBindGroup, VorticityImage, VorticityPipeline, VorticityPlugin};
 
-pub const WIDTH: u32 = 800;
-pub const HEIGHT: u32 = 600;
+pub const WIDTH: u32 = 600;
+pub const HEIGHT: u32 = 400;
 pub const SIZE: (u32, u32) = (WIDTH, HEIGHT);
 pub const WORKGROUP_SIZE: u32 = 8;
 ///平流(Advection)	初始速度场	更新速度场
@@ -59,6 +61,7 @@ struct FluidTextures {
     burns: Handle<Image>,
     cells: Handle<Image>,
     velocity_out: Handle<Image>,
+    output: Handle<Image>,
 }
 
 // 流体配置参数
@@ -245,61 +248,7 @@ impl Material2d for CellMaterial {
 }
 
 // 主应用
-fn main() {
-    App::new()
-        .add_plugins((
-            DefaultPlugins
-                .set(RenderPlugin {
-                    render_creation: WgpuSettings {
-                        backends: Some(Backends::VULKAN),
-                        ..default()
-                    }
-                        .into(),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        resolution: (768.0, 768.0).into(),
-                        title: "Cell Simulation".to_string(),
-                        ..default()
-                    }),
-                    ..default()
-                }),
-            Material2dPlugin::<CellMaterial>::default(),
-            ExtractResourcePlugin::<FluidConfig>::default(),
-            ExtractResourcePlugin::<FluidTextures>::default(),
 
-        ))
-        .insert_resource(CellGrid::new(768, 768))
-        .init_resource::<LastMousePos>()
-        .init_resource::<FluidTextures>()
-        .init_resource::<FluidConfig>()
-        .add_plugins(AdvectionPlugin)   // 平流插件
-        .add_plugins(CurlPlugin)       // 旋度插件
-        .add_plugins(VorticityPlugin)  // 涡度应用插件
-
-        .add_plugins(DivergencePlugin) // 散度插件
-        .add_plugins(PressurePlugin)   // 压力求解插件
-        .add_plugins(VelocityOutPlugin)    // 速度场修正插件
-        .add_plugins(GradientSubtractPlugin) // 梯度减法插件
-        .add_systems(Startup, setup)
-        .insert_resource(Falg(0))
-        // .add_systems(Render,update_texture_data)
-        .add_systems(Update, (
-            // handle_input,
-            // update_simulation,
-                // .after(handle_input),
-            update_texture_data,
-            update_simulation,
-            // rotate_system,
-                // .after(handle_input),
-            // update_shader_params,
-        ))
-        .add_systems(Render,(update_fluid_simulation_1,
-                     update_fluid_simulation_2
-        ).chain())
-        .run();
-}
 #[derive(Resource)]
 struct Falg(usize);
 
@@ -308,7 +257,7 @@ struct Falg(usize);
 #[derive(Component)]
 struct CellCanvas;
 
-fn setup(
+fn  setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<CellMaterial>>,
@@ -364,28 +313,41 @@ fn setup(
     mesh.insert_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3]));
 
     let quad = meshes.add(mesh);
-    // 创建数据纹理
-    let mut image = Image::new_fill(
-        Extent3d { width: 768, height: 768, depth_or_array_layers: 1 },
-        TextureDimension::D2,
-        &[0u8; 4],
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
-    );
-    image.sampler = ImageSampler::nearest();
+    fn create_texture(images: &mut Assets<Image>) -> Handle<Image> {
+        let mut image = Image::new_fill(
+            Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 },
+            TextureDimension::D2,
+            &[0u8; 4],
+            TextureFormat::Rgba8Unorm,
+            RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+        );
+        image.sampler = ImageSampler::nearest();
+        image.texture_descriptor.usage = TextureUsages::TEXTURE_BINDING
+            | TextureUsages::COPY_DST;
+        images.add(image)
+    }
 
-    // image.texture_descriptor.usage =
-    //      TextureUsages::COPY_SRC |
-    //         TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING |
-    // TextureUsages::COPY_DST;
-    image.texture_descriptor.usage=TextureUsages::TEXTURE_BINDING
-        | TextureUsages::COPY_DST;
-        // | TextureUsages::RENDER_ATTACHMENT;
-    let data_tex_handle = images.add(image); // 强引用在此处创建
+    // 创建存储纹理的函数
+    fn create_storage_texture(images: &mut Assets<Image>) -> Handle<Image> {
+        let mut image = Image::new_fill(
+            Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 },
+            TextureDimension::D2,
+            &[0u8; 4],
+            TextureFormat::Rgba8Unorm,
+            RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+        );
+        image.sampler = ImageSampler::nearest();
+        image.texture_descriptor.usage = TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING
+            | TextureUsages::COPY_DST | TextureUsages::COPY_SRC;
+        images.add(image)
+    }
 
+    // let data_tex_handle = images.add(image); // 强引用在此处创建
+    let cc=create_texture(&mut images);
     // 创建材质
     let material = materials.add(CellMaterial {
-        data_tex: data_tex_handle.clone(),
+        data_tex: cc.clone(),
+        // data_tex: data_tex_handle.clone(),
         params: ShaderParams {
             time: 0.0,
             dpi: 2.0,
@@ -421,24 +383,33 @@ fn setup(
     fluid_config.pressure_iterations = 20;
 
     // 创建流体模拟所需的纹理
-    let mut create_texture = || {
-        let mut image = Image::new_fill(Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 }, TextureDimension::D2, &[0, 0, 0, 0], TextureFormat::Rgba8Unorm, Default::default());
-        image.texture_descriptor.usage =
-            TextureUsages::TEXTURE_BINDING |
-                TextureUsages::STORAGE_BINDING |
-                TextureUsages::RENDER_ATTACHMENT;
-        images.add(image)
-    };
+    // let mut create_texture = || {
+    //     let mut image = Image::new_fill(Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 }, TextureDimension::D2, &[0, 0, 0, 0], TextureFormat::Rgba8Unorm, Default::default());
+    //     image.texture_descriptor.usage =
+    //         TextureUsages::TEXTURE_BINDING |
+    //             TextureUsages::STORAGE_BINDING |
+    //             TextureUsages::RENDER_ATTACHMENT;
+    //     images.add(image)
+    // };
     // 初始化所有纹理
-    fluid_textures.velocity = (create_texture(), create_texture());
-    fluid_textures.density = (create_texture(), create_texture());
-    fluid_textures.pressure = (create_texture(), create_texture());
-    fluid_textures.curl = create_texture();
-    fluid_textures.divergence = create_texture();
-    fluid_textures.burns = create_texture();
-    fluid_textures.cells = create_texture();
-    fluid_textures.velocity_out = create_texture();
+    // fluid_textures.velocity = (create_texture(), create_texture());
+    // fluid_textures.density = (create_texture(), create_texture());
+    // fluid_textures.pressure = (create_texture(), create_texture());
+    // fluid_textures.curl = create_texture();
+    // fluid_textures.divergence = create_texture();
+    // fluid_textures.burns = create_texture();
+    // fluid_textures.cells = create_texture();
+    // fluid_textures.velocity_out = create_texture();
+    fluid_textures.velocity = (create_texture(&mut images),create_storage_texture(&mut images) );
+    fluid_textures.density = (create_texture(&mut images), create_texture(&mut images));
+    fluid_textures.pressure = (create_texture(&mut images), create_storage_texture(&mut images));
+    fluid_textures.curl = create_storage_texture(&mut images);
+    fluid_textures.divergence =  create_storage_texture(&mut images);
+    fluid_textures.burns = create_texture(&mut images);
+    fluid_textures.cells = create_texture(&mut images);
+    fluid_textures.velocity_out = create_storage_texture(&mut images);
 
+    // commands.insert_resource(GameOfLifeImage { texture: cc });
     // 初始化AdvectionImage资源
     commands.insert_resource(AdvectionImage {
         velocity_tex: fluid_textures.velocity.0.clone(),
@@ -909,7 +880,63 @@ fn update_fire(grid: &mut CellGrid, x: usize, y: usize) {
 }
 
 
+fn main() {
+    App::new()
+        .add_plugins((
+            DefaultPlugins
+                .set(RenderPlugin {
+                    render_creation: WgpuSettings {
+                        backends: Some(Backends::VULKAN),
+                        ..default()
+                    }
+                        .into(),
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        resolution: (768.0, 768.0).into(),
+                        title: "Cell Simulation".to_string(),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+            Material2dPlugin::<CellMaterial>::default(),
 
+            ExtractResourcePlugin::<FluidConfig>::default(),
+            ExtractResourcePlugin::<FluidTextures>::default(),
+
+        ))
+        .insert_resource(CellGrid::new(WIDTH as usize, HEIGHT as usize))
+        .init_resource::<LastMousePos>()
+        .init_resource::<FluidTextures>()
+        .init_resource::<FluidConfig>()
+        // .add_plugins( GameOfLifeComputePlugin)
+        .add_plugins(AdvectionPlugin)   // 平流插件
+        .add_plugins(CurlPlugin)       // 旋度插件
+        .add_plugins(VorticityPlugin)  // 涡度应用插件
+        //
+        .add_plugins(DivergencePlugin) // 散度插件
+        .add_plugins(PressurePlugin)   // 压力求解插件
+        .add_plugins(VelocityOutPlugin)    // 速度场修正插件
+        .add_plugins(GradientSubtractPlugin) // 梯度减法插件
+        .add_systems(Startup, setup)
+        .insert_resource(Falg(0))
+        // .add_systems(Render,update_texture_data)
+        .add_systems(Update, (
+            // handle_input,
+            // update_simulation,
+            // .after(handle_input),
+            update_texture_data,
+            update_simulation,
+            // rotate_system,
+            // .after(handle_input),
+            // update_shader_params,
+        ))
+        .add_systems(Render,(update_fluid_simulation_1,
+                     update_fluid_simulation_2
+        ).chain())
+        .run();
+}
 
 
 

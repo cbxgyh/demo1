@@ -5,7 +5,7 @@ use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_resource::*;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, texture_storage_2d, uniform_buffer};
 use bevy::render::{render_graph, Render, RenderApp, RenderSet};
-use bevy::render::render_graph::{NodeRunError, RenderGraphContext};
+use bevy::render::render_graph::{NodeRunError, RenderGraph, RenderGraphContext, RenderLabel};
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use crate::{FluidConfig, HEIGHT, WIDTH, WORKGROUP_SIZE};
 
@@ -20,7 +20,9 @@ impl Plugin for AdvectionPlugin {
             Render,
             prepare_bind_group.in_set(RenderSet::PrepareBindGroups),
         );
-
+        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
+        render_graph.add_node(AdvectionComputeLabel, AdvectionComputeNode::default());
+        render_graph.add_node_edge(AdvectionComputeLabel, bevy::render::graph::CameraDriverLabel);
     }
 
     fn finish(&self, app: &mut App) {
@@ -163,7 +165,12 @@ fn prepare_bind_group(
 
 }
 
+#[derive(Default)]
 struct AdvectionComputeNode;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
+struct AdvectionComputeLabel;
+
 impl render_graph::Node for AdvectionComputeNode {
     fn run(
         &self,
@@ -178,12 +185,21 @@ impl render_graph::Node for AdvectionComputeNode {
         let mut pass = render_context
             .command_encoder()
             .begin_compute_pass(&ComputePassDescriptor::default());
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(advection_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &advection_bind_group.0, &[]);
+        pass.set_bind_group(0, &advection_bind_group.0, &[]);
+        if let CachedPipelineState::Ok(_) =
+            pipeline_cache.get_compute_pipeline_state(advection_pipeline.pipeline)
+        {
+            let update_pipeline = pipeline_cache
+                .get_compute_pipeline(advection_pipeline.pipeline)
+                .unwrap();
+            pass.set_pipeline(update_pipeline);
             pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
         }
+        // if let Some(pipeline) = pipeline_cache.get_compute_pipeline(advection_pipeline.pipeline) {
+        //     pass.set_pipeline(pipeline);
+        //     pass.set_bind_group(0, &advection_bind_group.0, &[]);
+        //     pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
+        // }
 
         Ok(())
     }

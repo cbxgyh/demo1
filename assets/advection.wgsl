@@ -30,6 +30,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var result = advection_uniforms.dissipation * (textureSampleLevel(source, sampler_linear, coord,0.0) + vec4<f32>(density, 0.0, 0.0, 0.0));
     result.a = 1.0;
-
+//    result=vec4<f32>(1.0,1.1,1.0,0.3);
     textureStore(output, vec2<i32>(global_id.xy), result);
 }  
