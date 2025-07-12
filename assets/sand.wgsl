@@ -13,6 +13,9 @@ struct VertexOutput {
 fn vertex(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
     output.uv = input.position;
+//    let float_pos = vec2f(f32(input.position.x), f32(input.position.y)) + 0.5;
+//
+//        output.uv = float_pos;
     output.position = vec4f(input.position, 0.0, 1.0);
     return output;
 }
@@ -83,7 +86,7 @@ fn fragment(@location(0) uv: vec2<f32>) -> @location(0) vec4f {// 修改text_coo
 
    let text_coord = vec2f(
       (uv.x + 1.0) * 0.5,
-              (uv.y + 1.0) * 0.5 // Y轴翻转
+             (uv.y + 1.0) * 0.5 // Y轴翻转
    );
     // 精确采样
     let tex_size = textureDimensions(data_tex);
@@ -223,10 +226,10 @@ fn fragment(@location(0) uv: vec2<f32>) -> @location(0) vec4f {// 修改text_coo
     }
 
     // 动态噪声效果
-    if (params.is_snapshot == 0u) {
+//    if (params.is_snapshot == 0u) {
         lightness *= 0.975 + noise2 * 0.025;
-    }
-    a = 0.7;
+//    }
+    a = 1.0;
     let hsv = vec3f(hue, saturation, lightness);
     return vec4f(hsv2rgb(hsv), a);
 }
