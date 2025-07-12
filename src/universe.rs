@@ -55,6 +55,9 @@ impl CellGrid {
             }
         }
         self.generation = self.generation.wrapping_add(1);
+        if self.generation  == 255 {
+            self.generation /=2;
+        }
         for x in 0..self.width {
             let scanx = if self.generation % 2 == 0 {
                 self.width - (1 + x)

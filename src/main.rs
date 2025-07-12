@@ -619,30 +619,34 @@ fn  setup(
     let (tx, rx) =  bounded::<SeedPosition>(5);
     // // 获取异步计算线程池
     // let task_pool = AsyncComputeTaskPool::get();
-
+    let tx2=tx.clone();
     // 提交异步任务 - 只计算位置，不修改资源
     // let task =  task_pool.spawn(async move {
     std::thread::spawn(move || {
         println!("[TASK] Starting seed generation"); // 添加开始日志
         // 提交异步任务
-        let width=WIDTH as i32;
-        let height=HEIGHT as i32;
+        let width = WIDTH as i32;
+        let height = HEIGHT as i32;
         let mut rng = rand::thread_rng();
-        // for x in (5..width-5).step_by(10){
-        //     let y = height - 40 + (5.0 * (x as f64 / 20.0).sin()).floor() as i32;
-        //     let size = rng.gen_range(10.0..16.0);
-        //     // cell_grid.paint(x, y, size as i32, Species::Sand);
-        //     let start_time = Instant::now();
-        //     let duration = Duration::from_secs_f32(rng.gen_range(0.0..0.1));
-        //     while start_time.elapsed() < duration {
-        //         // Spinning for 'duration', simulating doing hard work!
-        //     }
-        //     if tx.send(SeedPosition { x, y, size,s:Species::Sand}).is_err() {
-        //
-        //         break; // 如果接收端关闭则退出
-        //     }
-        //     // println!("sand:{:?},{:?}",x,y);
-        // }
+        for x in (5..width - 5).step_by(10) {
+            let y = height - 40 + (5.0 * (x as f64 / 20.0).sin()).floor() as i32;
+            let size = rng.gen_range(10.0..16.0);
+            // cell_grid.paint(x, y, size as i32, Species::Sand);
+            let start_time = Instant::now();
+            let duration = Duration::from_secs_f32(rng.gen_range(0.0..0.1));
+            while start_time.elapsed() < duration {
+                // Spinning for 'duration', simulating doing hard work!
+            }
+            if tx.send(SeedPosition { x, y, size, s: Species::Sand }).is_err() {
+                break; // 如果接收端关闭则退出
+            }
+            // println!("sand:{:?},{:?}",x,y);
+        }
+    });
+   std::thread::spawn(move || {
+       let width = WIDTH as i32;
+       let height = HEIGHT as i32;
+       let mut rng = rand::thread_rng();
         let mut x: i32 = 40;  // 起始位置
 
         while x <= width - 40 {
@@ -661,7 +665,7 @@ fn  setup(
             while start_time.elapsed() < duration {
                 // Spinning for 'duration', simulating doing hard work!
             }
-            if tx.send(SeedPosition { x, y, size:6.0,s:Species::Seed}).is_err() {
+            if tx2.send(SeedPosition { x, y, size:6.0,s:Species::Seed}).is_err() {
                 break; // 如果接收端关闭则退出
             }
             // 生成随机步长 (50-60)
