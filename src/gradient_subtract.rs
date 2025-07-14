@@ -8,6 +8,7 @@ use bevy::render::render_resource::*;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, texture_storage_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use crate::{FluidConfig, HEIGHT, WIDTH, WORKGROUP_SIZE};
+use crate::universe::CellGrid;
 // ... 原有代码 ...
 
 // 梯度减法所需的uniform数据
@@ -143,7 +144,7 @@ fn prepare_bind_group(
 }
 
 #[derive(Default)]
-struct GradientSubtractComputeNode;
+pub(crate) struct GradientSubtractComputeNode;
 
 impl render_graph::Node for GradientSubtractComputeNode {
     fn run(
@@ -177,7 +178,9 @@ pub struct GradientSubtractPlugin;
 
 impl Plugin for GradientSubtractPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ExtractResourcePlugin::<GradientSubtractImage>::default());
+        app.add_plugins(ExtractResourcePlugin::<GradientSubtractImage>::default())
+            .add_systems(Update,update_image)
+        ;
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
@@ -186,9 +189,7 @@ impl Plugin for GradientSubtractPlugin {
                 prepare_bind_group.in_set(RenderSet::PrepareBindGroups),
             );
 
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
-        render_graph.add_node(GradientLabel, GradientSubtractComputeNode::default());
-        render_graph.add_node_edge(GradientLabel, bevy::render::graph::CameraDriverLabel);
+
 
     }
 
@@ -199,4 +200,35 @@ impl Plugin for GradientSubtractPlugin {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
-struct GradientLabel;
+pub(crate) struct GradientLabel;
+
+fn update_image(
+    gradient_subtract_image: ResMut<GradientSubtractImage>,
+    cell_grid: Res<CellGrid>,
+    mut images: ResMut<Assets<Image>>,
+){
+    println!("Gradient Subtract Image");
+    if let Some(image) = images.get_mut(&gradient_subtract_image.cells_tex) {
+        let pixels = image.data.as_mut_slice();
+        println!("Gradient Subtract Image111");
+        for (i, cell) in cell_grid.cells.iter().enumerate() {
+            let idx = i * 4;
+            pixels[idx] = cell.species as u8; // R: 细胞类型
+            pixels[idx + 1] = cell.ra;        // G: 附加数据1
+            pixels[idx + 2] = cell.rb;        // B: 附加数据2
+            pixels[idx + 3] = cell.clock;     // A: 生命周期时钟
+        }
+    }
+    if let Some(image) = images.get_mut(&gradient_subtract_image.wind_tex) {
+        println!("Gradient Subtract Image222");
+        let pixels =   image.data.as_mut_slice();
+        for (i, cell) in cell_grid.winds.iter().enumerate() {
+            let idx = i * 4;
+            pixels[idx] = cell.dx;
+            pixels[idx+1] = cell.dy ;
+            pixels[idx+2] = cell.pressure;
+            pixels[idx+3] = cell.density;
+        }
+
+    }
+}

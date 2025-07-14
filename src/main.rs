@@ -9,6 +9,7 @@ mod fluid;
 mod display;
 mod compute_shader_game_of_life;
 mod universe;
+mod fluidsimulation;
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
@@ -37,10 +38,12 @@ use bevy::utils::petgraph::visit::NodeRef;
 use bevy::window::PrimaryWindow;
 use rand::{thread_rng, Rng};
 use rand::seq::SliceRandom;
-use crate::advection::{AdvectionBindGroup, AdvectionImage, AdvectionPipeline, AdvectionPlugin};
+use crate::advection::{ AdvectionPipeline, AdvectionPlugin, DensityAdvectionImage, VelocityAdvectionImage};
 use crate::compute_shader_game_of_life::{GameOfLifeComputePlugin, GameOfLifeImage};
 use crate::curl::{CurlBindGroup, CurlImage, CurlPipeline, CurlPlugin};
+use crate::display::DisplayPlugin;
 use crate::divergence::{DivergenceImage, DivergencePlugin};
+use crate::fluidsimulation::FluidSimulationPlugin;
 use crate::gradient_subtract::{GradientSubtractBindGroup, GradientSubtractImage, GradientSubtractPipeline, GradientSubtractPlugin};
 use crate::pressure::{PressureBindGroup, PressureImage, PressurePipeline, PressurePlugin};
 use crate::universe::{CellGrid, Species};
@@ -177,217 +180,9 @@ fn rotate_system(
         transform.rotation = Quat::from_rotation_z(angle.to_radians());
     }
 }
-fn update_fluid_simulation_1(
-    mut fluid_textures: ResMut<FluidTextures>,
-    fluid_config: Res<FluidConfig>,
-    mut commands: Commands,
-    pipeline_cache: Res<PipelineCache>,
-    mut render_device: ResMut<RenderDevice>,
-    advection_pipeline: Res<AdvectionPipeline>,
-    advection_bind_group: Res<AdvectionBindGroup>,
-    curl_pipeline: Res<CurlPipeline>,
-    curl_bind_group: Res<CurlBindGroup>,
-    vorticity_pipeline: Res<VorticityPipeline>,
-    vorticity_bind_group: Res<VorticityBindGroup>,
-    pressure_pipeline: Res<PressurePipeline>,
-    pressure_bind_group: Res<PressureBindGroup>,
-) {
-
-    // 执行流体模拟的各个步骤
-    // 注意：实际实现需要为每个计算步骤创建对应的计算着色器和Pipeline
-    let mut encoder= render_device.create_command_encoder(&CommandEncoderDescriptor::default());
-    // 1. 平流计算 advection #
-    // 执行平流计算
-    {
-
-        let mut pass =encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Advection Compute Pass"),
-                ..default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(advection_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &advection_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-
-    }
-
-    // 2. 燃烧和细胞纹理更新
-    // 这部分需要从WASM内存读取数据或通过其他方式更新
-
-    // 3. 密度平流 advection #
-    // run_advection_compute(
-    //     &mut commands,
-    //     &mut compute_pipelines,
-    //     &pipeline_cache,
-    //     &fluid_textures.density.0,
-    //     &fluid_textures.density.1,
-    //     dt,
-    //     fluid_config.density_dissipation,
-    // );
-
-    // 4. 处理用户交互（喷溅）
-    // 实现略...
-    //
-    // 5. 计算旋度 curl #
-    // 执行旋度计算
-    {
-
-        let mut pass = encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Curl Compute Pass"),
-                ..Default::default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(curl_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &curl_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-
-    }
-
-
-    // 6. 应用涡度 vorticity #
-    // 执行涡度应用计算
-    {
-        let mut pass = encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Vorticity Compute Pass"),
-                ..default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(vorticity_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &vorticity_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-        // 交换速度场缓冲区
-        let vel = &mut fluid_textures.velocity;
-        std::mem::swap(&mut vel.0, &mut vel.1);
-
-    }
-
-    // 7. 计算散度  divergence #
-    // 初始化DivergenceImage资源
-    {
-        let mut pass = encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Vorticity Compute Pass"),
-                ..default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(pressure_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &pressure_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-        // 交换速度场缓冲区
-        let vel = &mut fluid_textures.velocity;
-        std::mem::swap(&mut vel.0, &mut vel.1);
-
-    }
-
-    // 8. 压力场求解（迭代） pressure #
-    for _ in 0..fluid_config.pressure_iterations {
-        let mut pass = encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Pressure Compute Pass"),
-                ..default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(pressure_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &pressure_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-
-
-        // 交换读写缓冲区，为下一次迭代做准备
-        let vel = &mut fluid_textures.pressure;
-        std::mem::swap(&mut vel.0, &mut vel.1);
-        // std::mem::swap(&mut fluid_textures.pressure.0, &mut fluid_textures.pressure.1);
-
-    }
-
-
-}
-fn update_fluid_simulation_2(
-    mut fluid_textures: ResMut<FluidTextures>,
-    pipeline_cache: Res<PipelineCache>,
-    mut render_device: ResMut<RenderDevice>,
-    velocity_clamp_pipeline: Res<VelocityOutPipeline>,
-    velocity_clamp_bind_group: Res<VelocityOutBindGroup>,
-    gradient_subtract_pipeline: Res<GradientSubtractPipeline>,
-    gradient_subtract_bind_group: Res<GradientSubtractBindGroup>,
-) {
-    let mut encoder= render_device.create_command_encoder(&CommandEncoderDescriptor::default());
-    // 9. 速度场修正 velocity #
-    // 执行速度场修正
-    {
-        let mut pass = encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Velocity Out Compute Pass"),
-                ..default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(velocity_clamp_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &velocity_clamp_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-
-    }
 
 
 
-    // 10. 梯度减法 gradient_subtract #
-    // 执行梯度减法（速度场修正）
-    {
-        let mut pass = encoder
-            .begin_compute_pass(&ComputePassDescriptor {
-                label: Some("Gradient Subtract Compute Pass"),
-                ..default()
-            });
-
-        if let Some(pipeline) = pipeline_cache.get_compute_pipeline(gradient_subtract_pipeline.pipeline) {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &gradient_subtract_bind_group.0, &[]);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }
-    }
-    let vel = &mut fluid_textures.velocity;
-    std::mem::swap(&mut vel.0, &mut vel.1);
-    // 11. 交换速度缓冲区
-    // std::mem::swap(&mut fluid_textures.velocity.0, &mut fluid_textures.velocity.1);
-
-
-    // // 12. 显示结果
-    // update_display_texture(
-    //     &mut commands,
-    //     &mut render_pipelines,
-    //     &pipeline_cache,
-    //     &fluid_textures.density.0,
-    //     gpu_images.single().unwrap(),
-    // );
-}
-
-
-// fn handle_mouse_click(
-//     mut images: ResMut<Assets<Image>>,
-//     mut materials: ResMut<Assets<ColorMaterial>>,
-//     buttons: Res<ButtonInput<MouseButton>>,
-//     material_query: Query<&Handle<ColorMaterial>>,
-// )
-// {
-//     if buttons.just_pressed(MouseButton::Left) {
-//         for material_handle in material_query.iter() {
-//             if let Some(material) = materials.get_mut(material_handle) {
-//                 if let Some(image_handle) = material.texture.as_mut() {
-//                     if let Some(image) = images.get_mut(image_handle.id()) {
-//                     } } } } } }
 // 更新纹理数据
 fn update_texture_data(
     // cell_grid: Res<CellGrid>,
@@ -410,9 +205,6 @@ fn update_texture_data(
                     //             //
                     if(cell.species==Species::Seed){
                         let (x,y)=cell_grid.get_x_y(i as i32);
-                        if(x<10){
-                            println!("seed cell {:?}",cell_grid.get_x_y(i as i32) );
-                        }
 
                     }
                     pixels[idx] = cell.species as u8;
@@ -561,14 +353,8 @@ fn main() {
         .init_resource::<FluidTextures>()
         .init_resource::<FluidConfig>()
         // .add_plugins( GameOfLifeComputePlugin)
-        .add_plugins(AdvectionPlugin)   // 平流插件
-        .add_plugins(CurlPlugin)       // 旋度插件
-        .add_plugins(VorticityPlugin)  // 涡度应用插件
-        //
-        .add_plugins(DivergencePlugin) // 散度插件
-        .add_plugins(PressurePlugin)   // 压力求解插件
-        .add_plugins(VelocityOutPlugin)    // 速度场修正插件
-        .add_plugins(GradientSubtractPlugin) // 梯度减法插件
+        .add_plugins( FluidSimulationPlugin)
+
         .add_systems(Startup, setup)
         .insert_resource(Falg(0))
         // .add_systems(Render,update_texture_data)
@@ -579,15 +365,15 @@ fn main() {
             // debug_cameras,
             apply_seed_positions,
             update_texture_data.after(apply_seed_positions),
-
+            // update_image.after(update_texture_data),
             // update_simulation,
             // rotate_system,
             // .after(handle_input),
             // update_shader_params,
         ))
-        .add_systems(Render,(update_fluid_simulation_1,
-                     update_fluid_simulation_2
-        ).chain())
+        // .add_systems(Render,(update_fluid_simulation_1,
+        //              update_fluid_simulation_2
+        // ).chain())
         .run();
 }
 
@@ -603,7 +389,7 @@ fn apply_seed_positions(
     //     println!("rrrrrrrrrrr");
     //     cell_grid.paint(position.x, position.y, position.size as i32, position.s);
     // }
-
+    // cell_grid.winds()
 }
 
 fn  setup(
@@ -623,7 +409,6 @@ fn  setup(
     // 提交异步任务 - 只计算位置，不修改资源
     // let task =  task_pool.spawn(async move {
     std::thread::spawn(move || {
-        println!("[TASK] Starting seed generation"); // 添加开始日志
         // 提交异步任务
         let width = WIDTH as i32;
         let height = HEIGHT as i32;
@@ -777,15 +562,7 @@ fn  setup(
     fluid_config.pressure_dissipation = 0.99;
     fluid_config.pressure_iterations = 20;
 
-    // 创建流体模拟所需的纹理
-    // let mut create_texture = || {
-    //     let mut image = Image::new_fill(Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 }, TextureDimension::D2, &[0, 0, 0, 0], TextureFormat::Rgba8Unorm, Default::default());
-    //     image.texture_descriptor.usage =
-    //         TextureUsages::TEXTURE_BINDING |
-    //             TextureUsages::STORAGE_BINDING |
-    //             TextureUsages::RENDER_ATTACHMENT;
-    //     images.add(image)
-    // };
+
     // 初始化所有纹理
     // fluid_textures.velocity = (create_texture(), create_texture());
     // fluid_textures.density = (create_texture(), create_texture());
@@ -796,7 +573,7 @@ fn  setup(
     // fluid_textures.cells = create_texture();
     // fluid_textures.velocity_out = create_texture();
     fluid_textures.velocity = (create_texture(&mut images),create_storage_texture(&mut images) );
-    fluid_textures.density = (create_texture(&mut images), create_texture(&mut images));
+    fluid_textures.density = (create_texture(&mut images), create_storage_texture(&mut images));
     fluid_textures.pressure = (create_texture(&mut images), create_storage_texture(&mut images));
     fluid_textures.curl = create_storage_texture(&mut images);
     fluid_textures.divergence =  create_storage_texture(&mut images);
@@ -806,12 +583,24 @@ fn  setup(
 
     // commands.insert_resource(GameOfLifeImage { texture: cc });
     // 初始化AdvectionImage资源
-    commands.insert_resource(AdvectionImage {
+    commands.insert_resource(VelocityAdvectionImage {
         velocity_tex: fluid_textures.velocity.0.clone(),
         source_tex: fluid_textures.density.0.clone(),
+        // 注意：这里使用cells作为风场
         wind_tex: fluid_textures.cells.clone(),
+        // 输出到速度的写纹理
         output_tex: fluid_textures.velocity.1.clone(),
     });
+    commands.insert_resource(DensityAdvectionImage {
+        // 使用burns作为风场
+        wind_tex: fluid_textures.burns.clone(),
+        velocity_tex: fluid_textures.velocity.0.clone(),
+        // 使用密度作为源
+        source_tex: fluid_textures.density.0.clone(),
+        // 输出到密度的写纹理
+        output_tex: fluid_textures.density.1.clone(),
+    });
+
     // 初始化CurlImage资源
     commands.insert_resource(CurlImage {
         velocity_tex: fluid_textures.velocity.0.clone(),
@@ -849,7 +638,6 @@ fn  setup(
         output_tex: fluid_textures.velocity.1.clone(),
     });
 }
-
 
 
 

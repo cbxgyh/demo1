@@ -21,10 +21,6 @@ impl Plugin for CurlPlugin {
         )
         ;
 
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
-        render_graph.add_node(CurlComputeLabel, CurlComputeNode::default());
-        render_graph.add_node_edge(CurlComputeLabel, bevy::render::graph::CameraDriverLabel);
-
     }
 
     fn finish(&self, app: &mut App) {
@@ -148,9 +144,9 @@ fn prepare_bind_group(
     commands.insert_resource(CurlBindGroup(bind_group));
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
-struct CurlComputeLabel;
+pub(crate) struct CurlComputeLabel;
 #[derive(Default)]
-struct CurlComputeNode;
+pub(crate) struct CurlComputeNode;
 
 impl render_graph::Node for CurlComputeNode {
     fn run(

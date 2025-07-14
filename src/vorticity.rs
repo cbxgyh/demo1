@@ -9,7 +9,7 @@ use bevy::render::render_resource::binding_types::{sampler, texture_2d, texture_
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use bytemuck::{Pod, Zeroable};
 use crate::{FluidConfig, HEIGHT, WIDTH, WORKGROUP_SIZE};
-use crate::advection::{AdvectionImage, AdvectionPipeline};
+use crate::advection::{ AdvectionPipeline};
 // ... 原有代码 ...
 
 pub struct VorticityPlugin;
@@ -24,9 +24,7 @@ impl Plugin for VorticityPlugin {
                 Render,
                 prepare_bind_group.in_set(RenderSet::PrepareBindGroups),
             );
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
-        render_graph.add_node(VorticityLabel, VorticityComputeNode::default());
-        render_graph.add_node_edge(VorticityLabel, bevy::render::graph::CameraDriverLabel);
+
 
     }
 
@@ -36,7 +34,7 @@ impl Plugin for VorticityPlugin {
     }
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
-struct VorticityLabel;
+pub(crate) struct VorticityLabel;
 
 // 涡度应用所需的uniform数据
 #[repr(C)]
@@ -109,7 +107,7 @@ impl FromWorld for VorticityPipeline {
 }
 
 #[derive(Default)]
-struct VorticityComputeNode;
+pub(crate) struct VorticityComputeNode;
 
 impl render_graph::Node for VorticityComputeNode {
     fn run(

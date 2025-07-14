@@ -17,8 +17,8 @@ pub struct CellGrid {
     pub(crate) height: i32,
     pub(crate) cells: Vec<Cell>,
     undo_stack: VecDeque<Vec<Cell>>,
-    winds: Vec<Wind>,
-    burns: Vec<Wind>,
+    pub(crate) winds: Vec<Wind>,
+    pub(crate) burns: Vec<Wind>,
     generation: u8,
     rng: SplitMix64,
 }
@@ -302,9 +302,9 @@ fn update_cell(cell: Cell, api: SandApi) {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
     pub(crate) species: Species,
-    ra: u8,
-    rb: u8,
-    clock: u8,
+    pub(crate) ra: u8,
+    pub(crate) rb: u8,
+    pub(crate) clock: u8,
 }
 // Cell 的方法：
 // new：这是一个构造函数，创建一个新的 Cell 实例。它会基于物种（species）和随机生成的数值来初始化 ra 和 rb 属性。
@@ -324,10 +324,10 @@ impl Cell {
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wind {
-    dx: u8,
-    dy: u8,
-    pressure: u8,
-    density: u8,
+    pub(crate) dx: u8,
+    pub(crate) dy: u8,
+    pub(crate) pressure: u8,
+    pub(crate) density: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash,Default)]
@@ -2161,10 +2161,3 @@ pub fn split_dy_dx(s: u8) -> (i32, i32) {
 }
 
 use js_sys;
-#[test]
-fn ccc(){
-    println!("{:?}",rand::random::<f32>()
-    );
-
-    println!("{:?}",rand::random::<f32>()) ;
-}

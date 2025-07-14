@@ -138,7 +138,7 @@ fn prepare_bind_group(
 }
 
 #[derive(Default)]
-struct VelocityOutComputeNode;
+pub(crate) struct VelocityOutComputeNode;
 
 impl render_graph::Node for VelocityOutComputeNode {
     fn run(
@@ -180,9 +180,7 @@ impl Plugin for VelocityOutPlugin {
                 prepare_bind_group.in_set(RenderSet::PrepareBindGroups),
             )
             ;
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
-        render_graph.add_node(VorticityOutLabel, VelocityOutComputeNode::default());
-        render_graph.add_node_edge(VorticityOutLabel, bevy::render::graph::CameraDriverLabel);
+
     }
 
     fn finish(&self, app: &mut App) {
@@ -191,4 +189,4 @@ impl Plugin for VelocityOutPlugin {
     }
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
-struct VorticityOutLabel;
+pub(crate) struct VorticityOutLabel;

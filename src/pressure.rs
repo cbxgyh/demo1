@@ -1,9 +1,10 @@
 use std::borrow::Cow;
+use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
 use bevy::prelude::*;
 use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::{render_graph, Render, RenderApp, RenderSet};
-use bevy::render::render_graph::{NodeRunError, RenderGraph, RenderGraphContext, RenderLabel};
+use bevy::render::render_graph::{NodeRunError, RenderGraph, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNodeRunner};
 use bevy::render::render_resource::*;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, texture_storage_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
@@ -22,9 +23,6 @@ impl Plugin for PressurePlugin {
                 prepare_bind_group.in_set(RenderSet::PrepareBindGroups),
             );
 
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
-        render_graph.add_node(PressureComputeLabel,  PressureComputeNode::default());
-        render_graph.add_node_edge(PressureComputeLabel, bevy::render::graph::CameraDriverLabel);
 
     }
 
@@ -36,7 +34,7 @@ impl Plugin for PressurePlugin {
 
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
-struct PressureComputeLabel;
+pub(crate) struct PressureComputeLabel;
 // 压力求解所需的uniform数据
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable,ShaderType)]
@@ -157,7 +155,7 @@ impl FromWorld for PressurePipeline {
 }
 
 #[derive(Default)]
-struct PressureComputeNode;
+pub(crate) struct PressureComputeNode;
 
 impl render_graph::Node for PressureComputeNode {
     fn run(
