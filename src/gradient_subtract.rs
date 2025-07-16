@@ -7,7 +7,7 @@ use bevy::render::render_graph::{NodeRunError, RenderGraph, RenderGraphContext, 
 use bevy::render::render_resource::*;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, texture_storage_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
-use crate::{FluidConfig, HEIGHT, WIDTH, WORKGROUP_SIZE};
+use crate::{FluidConfig, FluidTextures, HEIGHT, WIDTH, WORKGROUP_SIZE};
 use crate::universe::CellGrid;
 // ... 原有代码 ...
 
@@ -58,7 +58,7 @@ impl FromWorld for GradientSubtractPipeline {
             push_constant_ranges: Vec::new(),
             shader: shader.clone(),
             shader_defs: vec![],
-            entry_point: Cow::from("main"),
+            entry_point: Cow::from("gradient_subtract_main"),
         });
 
         GradientSubtractPipeline {
@@ -156,7 +156,7 @@ impl render_graph::Node for GradientSubtractComputeNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let gradient_subtract_pipeline = world.resource::<GradientSubtractPipeline>();
         let gradient_subtract_bind_group = world.resource::<GradientSubtractBindGroup>();
-
+        // println!("Gradient Subtract Compute Pass");
         let mut pass = render_context
             .command_encoder()
             .begin_compute_pass(&ComputePassDescriptor {
@@ -179,7 +179,7 @@ pub struct GradientSubtractPlugin;
 impl Plugin for GradientSubtractPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ExtractResourcePlugin::<GradientSubtractImage>::default())
-            .add_systems(Update,update_image)
+            .add_systems(Update,swap_velocity_buffer)
         ;
 
         let render_app = app.sub_app_mut(RenderApp);
@@ -198,37 +198,41 @@ impl Plugin for GradientSubtractPlugin {
         render_app.init_resource::<GradientSubtractPipeline>();
     }
 }
+fn swap_velocity_buffer(mut fluid_textures: ResMut<FluidTextures>) {
+    let velocity = &mut fluid_textures.velocity;
+    std::mem::swap(&mut velocity.0, &mut velocity.1);
 
+}
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
 pub(crate) struct GradientLabel;
-
-fn update_image(
-    gradient_subtract_image: ResMut<GradientSubtractImage>,
-    cell_grid: Res<CellGrid>,
-    mut images: ResMut<Assets<Image>>,
-){
-    println!("Gradient Subtract Image");
-    if let Some(image) = images.get_mut(&gradient_subtract_image.cells_tex) {
-        let pixels = image.data.as_mut_slice();
-        println!("Gradient Subtract Image111");
-        for (i, cell) in cell_grid.cells.iter().enumerate() {
-            let idx = i * 4;
-            pixels[idx] = cell.species as u8; // R: 细胞类型
-            pixels[idx + 1] = cell.ra;        // G: 附加数据1
-            pixels[idx + 2] = cell.rb;        // B: 附加数据2
-            pixels[idx + 3] = cell.clock;     // A: 生命周期时钟
-        }
-    }
-    if let Some(image) = images.get_mut(&gradient_subtract_image.wind_tex) {
-        println!("Gradient Subtract Image222");
-        let pixels =   image.data.as_mut_slice();
-        for (i, cell) in cell_grid.winds.iter().enumerate() {
-            let idx = i * 4;
-            pixels[idx] = cell.dx;
-            pixels[idx+1] = cell.dy ;
-            pixels[idx+2] = cell.pressure;
-            pixels[idx+3] = cell.density;
-        }
-
-    }
-}
+//
+// fn update_image(
+//     gradient_subtract_image: ResMut<GradientSubtractImage>,
+//     cell_grid: Res<CellGrid>,
+//     mut images: ResMut<Assets<Image>>,
+// ){
+//     println!("Gradient Subtract Image");
+//     if let Some(image) = images.get_mut(&gradient_subtract_image.cells_tex) {
+//         let pixels = image.data.as_mut_slice();
+//         println!("Gradient Subtract Image111");
+//         for (i, cell) in cell_grid.cells.iter().enumerate() {
+//             let idx = i * 4;
+//             pixels[idx] = cell.species as u8; // R: 细胞类型
+//             pixels[idx + 1] = cell.ra;        // G: 附加数据1
+//             pixels[idx + 2] = cell.rb;        // B: 附加数据2
+//             pixels[idx + 3] = cell.clock;     // A: 生命周期时钟
+//         }
+//     }
+//     if let Some(image) = images.get_mut(&gradient_subtract_image.wind_tex) {
+//         println!("Gradient Subtract Image222");
+//         let pixels =   image.data.as_mut_slice();
+//         for (i, cell) in cell_grid.winds.iter().enumerate() {
+//             let idx = i * 4;
+//             pixels[idx] = cell.dx;
+//             pixels[idx+1] = cell.dy ;
+//             pixels[idx+2] = cell.pressure;
+//             pixels[idx+3] = cell.density;
+//         }
+//
+//     }
+// }

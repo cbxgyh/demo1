@@ -58,7 +58,7 @@ impl FromWorld for VelocityOutPipeline {
             push_constant_ranges: Vec::new(),
             shader: shader.clone(),
             shader_defs: vec![],
-            entry_point: Cow::from("main"),
+            entry_point: Cow::from("velocity_out_main"),
         });
 
         VelocityOutPipeline {
@@ -150,7 +150,7 @@ impl render_graph::Node for VelocityOutComputeNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let velocity_Out_pipeline = world.resource::<VelocityOutPipeline>();
         let velocity_Out_bind_group = world.resource::<VelocityOutBindGroup>();
-
+        // println!("Velocity Out  Compute Pass");
         let mut pass = render_context
             .command_encoder()
             .begin_compute_pass(&ComputePassDescriptor {

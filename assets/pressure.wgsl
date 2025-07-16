@@ -23,7 +23,7 @@ fn get_neighbor_uv(uv: vec2<f32>, direction: vec2<i32>) -> vec2<f32> {
 }
 //  pressure
 @compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn pressure_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let size = textureDimensions(pressure);
     if (global_id.x >= size.x || global_id.y >= size.y) {
         return;
@@ -46,5 +46,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // 或更通用形式：p = (neighbors_sum + alpha * div) * reciprocal_beta
     let pressure = (L + R + B + T - div) * 0.25;
 
+//    textureStore(output, vec2<i32>(global_id.xy), vec4<f32>(0.0, 0.0, 0.0, 1.0));
     textureStore(output, vec2<i32>(global_id.xy), vec4<f32>(pressure, 0.0, 0.0, 1.0));
 }

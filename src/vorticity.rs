@@ -8,7 +8,7 @@ use bevy::render::render_resource::*;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, texture_storage_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use bytemuck::{Pod, Zeroable};
-use crate::{FluidConfig, HEIGHT, WIDTH, WORKGROUP_SIZE};
+use crate::{FluidConfig, FluidTextures, HEIGHT, WIDTH, WORKGROUP_SIZE};
 use crate::advection::{ AdvectionPipeline};
 // ... 原有代码 ...
 
@@ -16,7 +16,9 @@ pub struct VorticityPlugin;
 
 impl Plugin for VorticityPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ExtractResourcePlugin::<VorticityImage>::default());
+        app.add_plugins(ExtractResourcePlugin::<VorticityImage>::default())
+            .add_systems(Update,swap_velocity_buffer)
+        ;
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
@@ -32,6 +34,12 @@ impl Plugin for VorticityPlugin {
         let render_app = app.sub_app_mut(RenderApp);
         render_app.init_resource::<VorticityPipeline>();
     }
+}
+
+fn swap_velocity_buffer(mut fluid_textures: ResMut<FluidTextures>) {
+    let velocity = &mut fluid_textures.velocity;
+    std::mem::swap(&mut velocity.0, &mut velocity.1);
+
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
 pub(crate) struct VorticityLabel;
@@ -96,7 +104,7 @@ impl FromWorld for VorticityPipeline {
             push_constant_ranges: Vec::new(),
             shader: shader.clone(),
             shader_defs: vec![],
-            entry_point: Cow::from("main"),
+            entry_point: Cow::from("vorticity_main"),
         });
 
         VorticityPipeline {
@@ -116,10 +124,11 @@ impl render_graph::Node for VorticityComputeNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
+
         let pipeline_cache = world.resource::<PipelineCache>();
         let vorticity_pipeline = world.resource::<VorticityPipeline>();
         let vorticity_bind_group = world.resource::<VorticityBindGroup>();
-
+        // println!("Vorticity  Compute Pass");
         let mut pass = render_context
             .command_encoder()
             .begin_compute_pass(&ComputePassDescriptor {

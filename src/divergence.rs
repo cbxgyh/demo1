@@ -68,7 +68,7 @@ impl FromWorld for DivergencePipeline {
             push_constant_ranges: Vec::new(),
             shader: shader.clone(),
             shader_defs: vec![],
-            entry_point: Cow::from("main"),
+            entry_point: Cow::from("divergence_main"),
         });
         DivergencePipeline {
             pipeline,
@@ -152,7 +152,7 @@ impl render_graph::Node for DivergenceComputeNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let divergence_pipeline = world.resource::<DivergencePipeline>();
         let divergence_bind_group = world.resource::<DivergenceBindGroup>();
-
+        // println!("Divergence Compute Pass");
         let mut pass = render_context
             .command_encoder()
             .begin_compute_pass(&ComputePassDescriptor {

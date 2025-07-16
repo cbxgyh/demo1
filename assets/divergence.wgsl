@@ -15,7 +15,7 @@ fn get_neighbor_uv(uv: vec2<f32>, direction: vec2<i32>) -> vec2<f32> {
 }
 //  divergence
 @compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn divergence_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let size = textureDimensions(velocity);
     if (global_id.x >= size.x || global_id.y >= size.y) {
         return;

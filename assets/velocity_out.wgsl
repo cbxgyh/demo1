@@ -14,7 +14,7 @@ struct VelocityOutUniforms {
 @group(0) @binding(4) var<uniform> velocity_out_uniforms: VelocityOutUniforms;
 //  velocity_out
 @compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn velocity_out_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let size = textureDimensions(velocity);
     if (global_id.x >= size.x || global_id.y >= size.y) {
         return;

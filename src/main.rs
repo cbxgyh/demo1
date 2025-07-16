@@ -10,6 +10,7 @@ mod display;
 mod compute_shader_game_of_life;
 mod universe;
 mod fluidsimulation;
+mod display2;
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
@@ -41,7 +42,9 @@ use rand::seq::SliceRandom;
 use crate::advection::{ AdvectionPipeline, AdvectionPlugin, DensityAdvectionImage, VelocityAdvectionImage};
 use crate::compute_shader_game_of_life::{GameOfLifeComputePlugin, GameOfLifeImage};
 use crate::curl::{CurlBindGroup, CurlImage, CurlPipeline, CurlPlugin};
-use crate::display::DisplayPlugin;
+use crate::display::DisplayTarget;
+// use crate::display1::DisplayPlugin;
+
 use crate::divergence::{DivergenceImage, DivergencePlugin};
 use crate::fluidsimulation::FluidSimulationPlugin;
 use crate::gradient_subtract::{GradientSubtractBindGroup, GradientSubtractImage, GradientSubtractPipeline, GradientSubtractPlugin};
@@ -203,7 +206,7 @@ fn update_texture_data(
                 for (i, cell) in cell_grid.cells.iter().enumerate() {
                     let idx = i * 4;
                     //             //
-                    if(cell.species==Species::Seed){
+                    if cell.species==Species::Seed {
                         let (x,y)=cell_grid.get_x_y(i as i32);
 
                     }
@@ -399,13 +402,16 @@ fn  setup(
     mut images: ResMut<Assets<Image>>,
     // primary_window: Query<PrimaryWindow>,
     mut fluid_textures: ResMut<FluidTextures>,
-    mut fluid_config: ResMut<FluidConfig>
+    mut fluid_config: ResMut<FluidConfig>,
+    mut cell_grid: ResMut<CellGrid>,
 )
 {
     let (tx, rx) =  bounded::<SeedPosition>(5);
     // // 获取异步计算线程池
     // let task_pool = AsyncComputeTaskPool::get();
     let tx2=tx.clone();
+    cell_grid.paint(300, 50, 60, Species::Water);
+    cell_grid.paint(550, 50, 60, Species::Fire);
     // 提交异步任务 - 只计算位置，不修改资源
     // let task =  task_pool.spawn(async move {
     std::thread::spawn(move || {
@@ -515,12 +521,37 @@ fn  setup(
             | TextureUsages::COPY_DST | TextureUsages::COPY_SRC;
         images.add(image)
     }
+    // 初始化流体配置
+    fluid_config.velocity_dissipation = 0.99;
+    fluid_config.density_dissipation = 0.99;
+    fluid_config.curl_strength = 3.0;
+    fluid_config.pressure_dissipation = 0.99;
+    fluid_config.pressure_iterations = 20;
 
+
+    // 初始化所有纹理
+    // fluid_textures.velocity = (create_texture(), create_texture());
+    // fluid_textures.density = (create_texture(), create_texture());
+    // fluid_textures.pressure = (create_texture(), create_texture());
+    // fluid_textures.curl = create_texture();
+    // fluid_textures.divergence = create_texture();
+    // fluid_textures.burns = create_texture();
+    // fluid_textures.cells = create_texture();
+    // fluid_textures.velocity_out = create_texture();
+    fluid_textures.velocity = (create_texture(&mut images),create_storage_texture(&mut images) );
+    fluid_textures.density = (create_texture(&mut images), create_storage_texture(&mut images));
+    fluid_textures.pressure = (create_texture(&mut images), create_storage_texture(&mut images));
+    fluid_textures.curl = create_storage_texture(&mut images);
+    fluid_textures.divergence =  create_storage_texture(&mut images);
+    fluid_textures.burns = create_texture(&mut images);
+    fluid_textures.cells = create_texture(&mut images);
+    fluid_textures.velocity_out = create_storage_texture(&mut images);
     // let data_tex_handle = images.add(image); // 强引用在此处创建
     let cc=create_texture(&mut images);
     // 创建材质
     let material = materials.add(CellMaterial {
-        data_tex: cc.clone(),
+        data_tex: fluid_textures.cells.clone(),
+        // data_tex: cc.clone(),
         // data_tex: data_tex_handle.clone(),
         params: ShaderParams {
             time: 0.0,
@@ -555,31 +586,7 @@ fn  setup(
         ..default()
     });
 
-    // 初始化流体配置
-    fluid_config.velocity_dissipation = 0.99;
-    fluid_config.density_dissipation = 0.99;
-    fluid_config.curl_strength = 3.0;
-    fluid_config.pressure_dissipation = 0.99;
-    fluid_config.pressure_iterations = 20;
 
-
-    // 初始化所有纹理
-    // fluid_textures.velocity = (create_texture(), create_texture());
-    // fluid_textures.density = (create_texture(), create_texture());
-    // fluid_textures.pressure = (create_texture(), create_texture());
-    // fluid_textures.curl = create_texture();
-    // fluid_textures.divergence = create_texture();
-    // fluid_textures.burns = create_texture();
-    // fluid_textures.cells = create_texture();
-    // fluid_textures.velocity_out = create_texture();
-    fluid_textures.velocity = (create_texture(&mut images),create_storage_texture(&mut images) );
-    fluid_textures.density = (create_texture(&mut images), create_storage_texture(&mut images));
-    fluid_textures.pressure = (create_texture(&mut images), create_storage_texture(&mut images));
-    fluid_textures.curl = create_storage_texture(&mut images);
-    fluid_textures.divergence =  create_storage_texture(&mut images);
-    fluid_textures.burns = create_texture(&mut images);
-    fluid_textures.cells = create_texture(&mut images);
-    fluid_textures.velocity_out = create_storage_texture(&mut images);
 
     // commands.insert_resource(GameOfLifeImage { texture: cc });
     // 初始化AdvectionImage资源
@@ -637,6 +644,13 @@ fn  setup(
         cells_tex: fluid_textures.cells.clone(),
         output_tex: fluid_textures.velocity.1.clone(),
     });
+    // commands.insert_resource(DisplayImage {
+    //     density_tex: fluid_textures.density.0.clone(),
+    //     output_tex: create_storage_texture(&mut images),
+    // });
+    commands.insert_resource(DisplayTarget {
+            image: fluid_textures.cells.clone()
+        });
 }
 
 

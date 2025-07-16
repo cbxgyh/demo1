@@ -1209,7 +1209,7 @@ pub fn update_fire(cell: Cell, mut api: SandApi) {
     // api.rand_dir() 返回一个随机的方向值（可能是 -1、0、1），因此这个变化是有随机性的。
     let ra = cell.ra;
     let mut degraded = cell.clone();
-    degraded.ra = ra - (2 + api.rand_dir()) as u8;
+    degraded.ra = ra.saturating_sub((2 + api.rand_dir()) as u8);
 
     // 2. 随机选择一个方向进行扩散
     // api.rand_vec() 返回一个随机的二维向量 (dx, dy)，用来表示火焰扩散的方向。

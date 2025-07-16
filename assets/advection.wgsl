@@ -14,7 +14,7 @@ struct AdvectionUniforms {
 @group(0) @binding(5) var<uniform> advection_uniforms: AdvectionUniforms;
 // advection
 @compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn advection_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     if (global_id.x >= u32(textureDimensions(output).x) ||
         global_id.y >= u32(textureDimensions(output).y)) {
         return;

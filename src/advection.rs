@@ -15,7 +15,12 @@ impl Plugin for AdvectionPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ExtractResourcePlugin::<VelocityAdvectionImage>::default())
         .add_plugins(ExtractResourcePlugin::<DensityAdvectionImage>::default())
-            .add_systems(Update, update_burns_and_cells_textures);
+            .add_systems(Update,
+                         (
+                             update_burns_and_cells_textures,
+                             swap_velocity_buffer.after(update_burns_and_cells_textures),
+                         // check_density_texture.after(swap_velocity_buffer)
+            ));
         ;
         let render_app = app.sub_app_mut(RenderApp);
         render_app.add_systems(
@@ -91,7 +96,7 @@ impl FromWorld for AdvectionPipeline {
             push_constant_ranges: Vec::new(),
             shader: shader.clone(),
             shader_defs: vec![],
-            entry_point: Cow::from("main"),
+            entry_point: Cow::from("advection_main"),
         });
 
 
@@ -196,6 +201,7 @@ fn prepare_density_bind_group(
     time: Res<Time>,
     fluid_config: Res<FluidConfig>,
 ) {
+
     let wind_view  = gpu_images.get(&advection_image.wind_tex).unwrap();
     let velocity_view = gpu_images.get(&advection_image.velocity_tex).unwrap();
     let source_view  = gpu_images.get(&advection_image.source_tex).unwrap();
@@ -248,7 +254,7 @@ fn prepare_density_bind_group(
 #[derive(Default)]
 pub(crate) struct VelocityAdvectionComputeNode;
 #[derive(Default)]
-struct DensityAdvectionComputeNode;
+pub(crate) struct DensityAdvectionComputeNode;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone,RenderLabel)]
 pub(crate) struct VelocityAdvectionComputeLabel;
@@ -264,10 +270,12 @@ impl render_graph::Node for VelocityAdvectionComputeNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let advection_pipeline = world.resource::<AdvectionPipeline>();
         let advection_bind_group = world.resource::<VelocityAdvectionBindGroup>();
-
+        // println!("Velocity Compute Pass");
         let mut pass = render_context
             .command_encoder()
-            .begin_compute_pass(&ComputePassDescriptor::default());
+            .begin_compute_pass(&ComputePassDescriptor {
+                label: Some("Velocity Compute Pass"),
+                ..default()});
         pass.set_bind_group(0, &advection_bind_group.0, &[]);
         if let CachedPipelineState::Ok(_) =
             pipeline_cache.get_compute_pipeline_state(advection_pipeline.pipeline)
@@ -281,11 +289,23 @@ impl render_graph::Node for VelocityAdvectionComputeNode {
         }else {
 
         }
-
-        Ok(())
+       Ok(())
     }
 }
-impl render_graph::Node for DensityAdvectionComputeNode  {
+fn swap_velocity_buffer(mut fluid_textures: ResMut<FluidTextures>) {
+    let velocity = &mut fluid_textures.velocity;
+    let prev_front = velocity.0.clone();
+    let prev_back = velocity.1.clone();
+
+    std::mem::swap(&mut velocity.0, &mut velocity.1);
+    // info!("Velocity: {} -> {}, {} -> {}",
+    //     prev_front, fluid_textures.velocity.1,
+    //     prev_back, fluid_textures.velocity.0);
+    let density = &mut fluid_textures.density;
+    std::mem::swap(&mut density.0, &mut density.1);
+}
+
+impl render_graph::Node for DensityAdvectionComputeNode {
     fn run(
         &self,
         graph: &mut RenderGraphContext,
@@ -295,28 +315,33 @@ impl render_graph::Node for DensityAdvectionComputeNode  {
         let pipeline_cache = world.resource::<PipelineCache>();
         let advection_pipeline = world.resource::<AdvectionPipeline>();
         let advection_bind_group = world.resource::<DensityAdvectionBindGroup>();
-
+        // println!("Density Compute Pass");
+        // 创建计算通道
         let mut pass = render_context
             .command_encoder()
-            .begin_compute_pass(&ComputePassDescriptor::default());
+            .begin_compute_pass(&ComputePassDescriptor {
+                label: Some("Density Compute Pass"),
+                ..default()});
+
         pass.set_bind_group(0, &advection_bind_group.0, &[]);
+
         if let CachedPipelineState::Ok(_) =
             pipeline_cache.get_compute_pipeline_state(advection_pipeline.pipeline)
         {
-
-            let update_pipeline = pipeline_cache
-                .get_compute_pipeline(advection_pipeline.pipeline)
-                .unwrap();
-            pass.set_pipeline(update_pipeline);
-            pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
-        }else {
-
+            if let Some(update_pipeline) = pipeline_cache.get_compute_pipeline(advection_pipeline.pipeline) {
+                pass.set_pipeline(update_pipeline);
+                pass.dispatch_workgroups(WIDTH / WORKGROUP_SIZE, HEIGHT / WORKGROUP_SIZE, 1);
+            } else {
+                warn!("Compute pipeline not found in cache");
+            }
+        } else {
+            warn!("Pipeline not ready");
         }
+
 
         Ok(())
     }
 }
-
 
 // 更新燃烧和细胞纹理的系统
 fn update_burns_and_cells_textures(
@@ -333,6 +358,7 @@ fn update_burns_and_cells_textures(
             pixels[idx + 1] = wind.dy;
             pixels[idx + 2] = wind.pressure;
             pixels[idx + 3] = wind.density;
+
         }
     }
 
@@ -348,7 +374,36 @@ fn update_burns_and_cells_textures(
         }
     }
 }
+fn check_density_texture(
+    images: Res<Assets<Image>>,
+    fluid_textures: Res<FluidTextures>,
+    frame_count: Local<u32>,
+) {
+    let frame = *frame_count;
+    if frame % 60 == 0 { // 每秒检查一次
+        if let Some(image) = images.get(&fluid_textures.density.0) {
+            let sample_pos = 0; // 检查第一个像素
+            if image.data.len() >= 4 {
+                let r = image.data[sample_pos];
+                let g = image.data[sample_pos + 1];
+                let b = image.data[sample_pos + 2];
+                let a = image.data[sample_pos + 3];
+                info!("Density texture sample: R:{}, G:{}, B:{}, A:{}", r, g, b, a);
+            }
+        }
 
+        if let Some(image) = images.get(&fluid_textures.density.1) {
+            let sample_pos = 0;
+            if image.data.len() >= 4 {
+                let r = image.data[sample_pos];
+                let g = image.data[sample_pos + 1];
+                let b = image.data[sample_pos + 2];
+                let a = image.data[sample_pos + 3];
+                info!("Density texture (back buffer) sample: R:{}, G:{}, B:{}, A:{}", r, g, b, a);
+            }
+        }
+    }
+}
 // 假设的数据资源
 #[derive(Resource)]
 pub struct BurnsData(pub Vec<u8>);

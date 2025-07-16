@@ -62,12 +62,12 @@ impl FromWorld for CurlPipeline {
             .load("curl.wgsl");
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-            label: None,
+            label: Some(Cow::from("curl")),
             layout: vec![bind_group_layout.clone()],
             push_constant_ranges: Vec::new(),
             shader: shader.clone(),
             shader_defs: vec![],
-            entry_point: Cow::from("main"),
+            entry_point: Cow::from("curl_main"),
         });
         CurlPipeline {
             pipeline,
@@ -159,7 +159,7 @@ impl render_graph::Node for CurlComputeNode {
         let curl_pipeline = world.resource::<CurlPipeline>();
         let curl_bind_group = world.resource::<CurlBindGroup>();
 
-
+        // println!("Curl Compute Pass");
         let mut pass = render_context
             .command_encoder()
             .begin_compute_pass(&ComputePassDescriptor {

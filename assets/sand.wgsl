@@ -19,6 +19,8 @@ fn vertex(input: VertexInput) -> VertexOutput {
     output.position = vec4f(input.position, 0.0, 1.0);
     return output;
 }
+
+
 // 片段着色器 fragment.wgsl
 struct ShaderParams {
     time: f32,
@@ -57,11 +59,9 @@ fn hsv2rgb(hsv: vec3<f32>) -> vec3<f32> {
 fn mod1(a: f32, b: f32) -> f32 {
     return a - b * floor(a / b);
 }
-
 fn random(pos: vec2f) -> f32 {
     return fract(sin(dot(pos, vec2f(12.9898, 78.233))) * 43758.5453);
 }
-
 fn snoise2(pos: vec2f) -> f32 {
     let i = floor(pos);
     let f = fract(pos);
@@ -75,7 +75,6 @@ fn snoise2(pos: vec2f) -> f32 {
     let u = f * f * (3.0 - 2.0 * f);
     return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
-
 fn snoise3(pos: vec3f) -> f32 {
     return snoise2(pos.xy) * 0.8 + snoise2(pos.yz) * 0.2;
 }
