@@ -48,5 +48,9 @@ fn fragment(input: FullscreenVertexOutput) ->@location(0) vec4<f32>  {
     color *= vec3<f32>(0.95, 0.9, 0.9);
 
     // 输出颜色
-    return vec4<f32>(color,0.0);
+//    return vec4<f32>(color,1.0);
+// 显示节点输出纯绿色
+//如果 DisplayNode 先执行：屏幕会是红色（因为后执行的 CellMaterial
+//覆盖了 DisplayNode 的绿色输出）
+    return vec4<f32>(0.0, 1.0, 0.0, 1.0);
 }

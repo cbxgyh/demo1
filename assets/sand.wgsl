@@ -228,7 +228,9 @@ fn fragment(@location(0) uv: vec2<f32>) -> @location(0) vec4f {// 修改text_coo
 //    if (params.is_snapshot == 0u) {
         lightness *= 0.975 + noise2 * 0.025;
 //    }
-    a = 1.0;
+//    a = 1.0;
     let hsv = vec3f(hue, saturation, lightness);
     return vec4f(hsv2rgb(hsv), a);
+// 材质输出纯红色
+// return vec4<f32>(1.0, 0.0, 0.0, 1.0);
 }

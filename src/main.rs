@@ -544,7 +544,7 @@ fn  setup(
     fluid_textures.curl = create_storage_texture(&mut images);
     fluid_textures.divergence =  create_storage_texture(&mut images);
     fluid_textures.burns = create_texture(&mut images);
-    fluid_textures.cells = create_texture(&mut images);
+    fluid_textures.cells = create_storage_texture(&mut images);
     fluid_textures.velocity_out = create_storage_texture(&mut images);
     // let data_tex_handle = images.add(image); // 强引用在此处创建
     let cc=create_texture(&mut images);
@@ -570,6 +570,7 @@ fn  setup(
                 scale: Vec3::new(WIDTH as f32, HEIGHT as f32 ,1.0),
                 ..default()
             },
+
             ..default()
         },
         CellCanvas,
@@ -588,7 +589,7 @@ fn  setup(
 
 
 
-    // commands.insert_resource(GameOfLifeImage { texture: cc });
+    commands.insert_resource(GameOfLifeImage { texture:  fluid_textures.cells.clone() });
     // 初始化AdvectionImage资源
     commands.insert_resource(VelocityAdvectionImage {
         velocity_tex: fluid_textures.velocity.0.clone(),
