@@ -14,6 +14,8 @@ mod display2;
 mod clear;
 
 use std::collections::VecDeque;
+use std::mem::swap;
+use std::process::id;
 use std::time::{Duration, Instant};
 use crossbeam_channel::{bounded, Receiver};
 use bevy::{
@@ -530,7 +532,16 @@ fn  setup(
     fluid_config.pressure_dissipation = 0.99;
     fluid_config.pressure_iterations = 20;
 
-
+    let (mut x,mut y) =(create_texture(&mut images),create_texture(&mut images));
+    {
+        println!("x_y_{:?},{:?}", (&x).id(),(&y).id());
+    }
+    {
+        swap(&mut x,&mut y);
+    }
+    {
+        println!("x_y_{:?},{:?}", x.id(), y.id());
+    }
     // 初始化所有纹理
     // fluid_textures.velocity = (create_texture(), create_texture());
     // fluid_textures.density = (create_texture(), create_texture());

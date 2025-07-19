@@ -3,7 +3,7 @@
 @group(0) @binding(1) var curl: texture_2d<f32>;
 @group(0) @binding(2) var output: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(3) var sampler_velocity: sampler;
-@group(0) @binding(3) var sampler_curl: sampler;
+@group(0) @binding(4) var sampler_curl: sampler;
 
 struct VorticityUniforms {
     texel_size: vec2<f32>,
@@ -11,7 +11,7 @@ struct VorticityUniforms {
     dt: f32,             // 时间步长
 };
 
-@group(0) @binding(4) var<uniform> vorticity_uniforms: VorticityUniforms;
+@group(0) @binding(5) var<uniform> vorticity_uniforms: VorticityUniforms;
 
 // 计算相邻像素坐标
 fn get_neighbor_uv(uv: vec2<f32>, direction: vec2<i32>) -> vec2<f32> {
