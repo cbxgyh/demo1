@@ -41,6 +41,9 @@ impl FromWorld for GradientSubtractPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     texture_storage_2d(TextureFormat::Rgba8Unorm, StorageTextureAccess::WriteOnly),
                     sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<GradientSubtractUniforms>(false)
                 )
             ));
@@ -71,12 +74,16 @@ impl FromWorld for GradientSubtractPipeline {
 #[derive(Resource, Clone, ExtractResource, AsBindGroup)]
 pub struct GradientSubtractImage {
     #[texture(0, visibility(compute))]
+    #[sampler(5)]
     pub(crate) pressure_tex: Handle<Image>,
     #[texture(1, visibility(compute))]
+    #[sampler(6)]
     pub(crate) velocity_tex: Handle<Image>,
     #[texture(2, visibility(compute))]
+    #[sampler(7)]
     pub(crate) wind_tex: Handle<Image>,
     #[texture(3, visibility(compute))]
+    #[sampler(8)]
     pub(crate) cells_tex: Handle<Image>,
     #[storage_texture(4, image_format = Rgba8Unorm, access = ReadWrite)]
     pub(crate) output_tex: Handle<Image>,
@@ -99,7 +106,28 @@ fn prepare_bind_group(
     let cells_tex_view = gpu_images.get(&gradient_subtract_image.cells_tex).unwrap();
     let output_tex_view = gpu_images.get(&gradient_subtract_image.output_tex).unwrap();
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor {
+    let pressure_sampler = render_device.create_sampler(&SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        ..Default::default()
+    });
+    let velocity_sampler = render_device.create_sampler(&SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        ..Default::default()
+    });
+    let wind_sampler = render_device.create_sampler(&SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        ..Default::default()
+    });
+    let cells_sampler = render_device.create_sampler(&SamplerDescriptor {
         address_mode_u: AddressMode::ClampToEdge,
         address_mode_v: AddressMode::ClampToEdge,
         mag_filter: FilterMode::Linear,
@@ -130,7 +158,10 @@ fn prepare_bind_group(
                     &wind_tex_view.texture_view,
                     &cells_tex_view.texture_view,
                     &output_tex_view.texture_view,
-                    &sampler,
+                    &pressure_sampler,
+                    &velocity_sampler,
+                    &wind_sampler,
+                    &cells_sampler,
                     BindingResource::Buffer(BufferBinding {
                         buffer: &uniform_buffer,
                         offset: 0,

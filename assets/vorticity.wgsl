@@ -2,7 +2,8 @@
 @group(0) @binding(0) var velocity: texture_2d<f32>;
 @group(0) @binding(1) var curl: texture_2d<f32>;
 @group(0) @binding(2) var output: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(3) var sampler_linear: sampler;
+@group(0) @binding(3) var sampler_velocity: sampler;
+@group(0) @binding(3) var sampler_curl: sampler;
 
 struct VorticityUniforms {
     texel_size: vec2<f32>,
@@ -31,9 +32,9 @@ fn vorticity_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let uv = vec2<f32>(global_id.xy) / vec2<f32>(size);
 
     // 采样当前位置和相邻位置的涡度
-    let T = textureSampleLevel(curl, sampler_linear, get_neighbor_uv(uv, vec2(0, 1)),0.).x;
-    let B = textureSampleLevel(curl, sampler_linear, get_neighbor_uv(uv, vec2(0, -1)),0.).x;
-    let C = textureSampleLevel(curl, sampler_linear, uv,0.).x;
+    let T = textureSampleLevel(curl, sampler_curl, get_neighbor_uv(uv, vec2(0, 1)),0.).x;
+    let B = textureSampleLevel(curl, sampler_curl, get_neighbor_uv(uv, vec2(0, -1)),0.).x;
+    let C = textureSampleLevel(curl, sampler_curl, uv,0.).x;
 
     // 计算涡度力（涡度平流）
     // 力的方向垂直于涡度梯度方向
@@ -44,7 +45,7 @@ fn vorticity_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     force *= (vorticity_uniforms.curl_strength * C) / length_force;
 
     // 采样当前速度并添加涡度力
-    let vel = textureSampleLevel(velocity, sampler_linear, uv,0.).xy;
+    let vel = textureSampleLevel(velocity, sampler_velocity, uv,0.).xy;
     let new_vel = vel + force * vorticity_uniforms.dt;
 
     textureStore(output, vec2<i32>(global_id.xy), vec4<f32>(new_vel, 0.0, 1.0));

@@ -2,7 +2,8 @@
 @group(0) @binding(0) var velocity: texture_2d<f32>;
 @group(0) @binding(1) var pressure: texture_2d<f32>;
 @group(0) @binding(2) var output: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(3) var sampler_linear: sampler;
+@group(0) @binding(3) var sampler_velocity: sampler;
+@group(0) @binding(4) var sampler_pressure: sampler;
 
 struct VelocityOutUniforms {
     min_value: f32,      // 最小值限制
@@ -11,7 +12,7 @@ struct VelocityOutUniforms {
     offset: vec2<f32>,   // 偏移量
 };
 
-@group(0) @binding(4) var<uniform> velocity_out_uniforms: VelocityOutUniforms;
+@group(0) @binding(5) var<uniform> velocity_out_uniforms: VelocityOutUniforms;
 //  velocity_out
 @compute @workgroup_size(8, 8)
 fn velocity_out_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -23,8 +24,8 @@ fn velocity_out_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let uv = vec2<f32>(global_id.xy) / vec2<f32>(size);
 
     // 采样速度和压力
-    let v = textureSampleLevel(velocity, sampler_linear, uv,0.).rg;
-    let p = textureSampleLevel(pressure, sampler_linear, uv,0.).r;
+    let v = textureSampleLevel(velocity, sampler_velocity, uv,0.).rg;
+    let p = textureSampleLevel(pressure, sampler_pressure, uv,0.).r;
 
     // 合并为vec3 (vx, vy, pressure)
     var vp = vec3<f32>(v, p);

@@ -87,6 +87,7 @@ impl FromWorld for VorticityPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     texture_storage_2d(TextureFormat::Rgba8Unorm, StorageTextureAccess::WriteOnly),
                     sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<VorticityUniforms>(false)
                 )
             ));
@@ -158,7 +159,7 @@ fn prepare_bind_group(
     let curl_tex_view = gpu_images.get(&vorticity_image.curl_tex).unwrap();
     let output_tex_view = gpu_images.get(&vorticity_image.output_tex).unwrap();
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor {
+    let velocity_sampler = render_device.create_sampler(&SamplerDescriptor {
         address_mode_u: AddressMode::ClampToEdge,
         address_mode_v: AddressMode::ClampToEdge,
         mag_filter: FilterMode::Linear,
@@ -166,6 +167,13 @@ fn prepare_bind_group(
         ..Default::default()
     });
 
+    let curl_sampler = render_device.create_sampler(&SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        ..Default::default()
+    });
     let dt = time.delta_seconds().min(0.016);
     let curl_strength = fluid_config.curl_strength;
 
@@ -190,7 +198,8 @@ fn prepare_bind_group(
                     &velocity_tex_view.texture_view,
                     &curl_tex_view.texture_view,
                     &output_tex_view.texture_view,
-                    &sampler,
+                    &velocity_sampler,
+                    &curl_sampler,
                     BindingResource::Buffer(BufferBinding {
                         buffer: &uniform_buffer,
                         offset: 0,

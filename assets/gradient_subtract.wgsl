@@ -4,7 +4,10 @@
 @group(0) @binding(2) var wind: texture_2d<f32>;
 @group(0) @binding(3) var cells: texture_2d<f32>;
 @group(0) @binding(4) var output: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(5) var sampler_linear: sampler;
+@group(0) @binding(5) var sampler_pressure: sampler;
+@group(0) @binding(6) var sampler_velocity: sampler;
+@group(0) @binding(7) var sampler_wind: sampler;
+@group(0) @binding(8) var sampler_cells: sampler;
 
 struct GradientSubtractUniforms {
     texel_size: vec2<f32>,
@@ -12,7 +15,7 @@ struct GradientSubtractUniforms {
     damping: f32,        // 阻尼系数
 };
 
-@group(0) @binding(6) var<uniform> gradient_subtract_uniforms: GradientSubtractUniforms;
+@group(0) @binding(9) var<uniform> gradient_subtract_uniforms: GradientSubtractUniforms;
 
 // 边界处理函数
 fn boundary(uv: vec2<f32>) -> vec2<f32> {
@@ -34,15 +37,15 @@ fn gradient_subtract_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let uv = vec2<f32>(global_id.xy) / vec2<f32>(size);
 
     // 计算压力梯度（相邻压力差）
-    let L = textureSampleLevel(pressure, sampler_linear, get_neighbor_uv(uv, vec2(-1, 0)),0.).x;
-    let R = textureSampleLevel(pressure, sampler_linear, get_neighbor_uv(uv, vec2(1, 0)),0.).x;
-    let T = textureSampleLevel(pressure, sampler_linear, get_neighbor_uv(uv, vec2(0, 1)),0.).x;
-    let B = textureSampleLevel(pressure, sampler_linear, get_neighbor_uv(uv, vec2(0, -1)),0.).x;
+    let L = textureSampleLevel(pressure, sampler_pressure, get_neighbor_uv(uv, vec2(-1, 0)),0.).x;
+    let R = textureSampleLevel(pressure, sampler_pressure, get_neighbor_uv(uv, vec2(1, 0)),0.).x;
+    let T = textureSampleLevel(pressure, sampler_pressure, get_neighbor_uv(uv, vec2(0, 1)),0.).x;
+    let B = textureSampleLevel(pressure, sampler_pressure, get_neighbor_uv(uv, vec2(0, -1)),0.).x;
 
     // 采样当前速度、风力和单元格类型
-    let vel = textureSampleLevel(velocity, sampler_linear, uv,0.).xy;
-    let wind = textureSampleLevel(wind, sampler_linear, uv,0.).xy;
-    let cell = textureSampleLevel(cells, sampler_linear, uv,0.).xy;
+    let vel = textureSampleLevel(velocity, sampler_velocity, uv,0.).xy;
+    let wind = textureSampleLevel(wind, sampler_wind, uv,0.).xy;
+    let cell = textureSampleLevel(cells, sampler_cells, uv,0.).xy;
 
     // 1. 压力梯度减法（使流体不可压缩）
     var new_vel = vel - vec2(R - L, T - B);

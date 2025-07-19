@@ -85,6 +85,7 @@ impl FromWorld for CurlPipeline {
 #[derive(Resource, Clone, ExtractResource, AsBindGroup)]
 pub struct CurlImage {
     #[texture(0, visibility(compute))]
+    #[sampler(2)]
     pub(crate) velocity_tex: Handle<Image>,
     #[storage_texture(1, image_format = Rgba8Unorm, access = ReadWrite)]
     pub(crate) output_tex: Handle<Image>,

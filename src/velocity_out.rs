@@ -41,6 +41,7 @@ impl FromWorld for VelocityOutPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     texture_storage_2d(TextureFormat::Rgba8Unorm, StorageTextureAccess::WriteOnly),
                     sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<VelocityOutUniforms>(false)
                 )
             )
@@ -71,8 +72,10 @@ impl FromWorld for VelocityOutPipeline {
 #[derive(Resource, Clone, ExtractResource, AsBindGroup)]
 pub struct VelocityOutImage {
     #[texture(0, visibility(compute))]
+    #[sampler(3)]
     pub(crate) velocity_tex: Handle<Image>,
     #[texture(1, visibility(compute))]
+    #[sampler(4)]
     pub(crate) pressure_tex: Handle<Image>,
     #[storage_texture(2, image_format = Rgba8Unorm, access = ReadWrite)]
     pub(crate) output_tex: Handle<Image>,
@@ -93,14 +96,20 @@ fn prepare_bind_group(
     let pressure_tex_view = gpu_images.get(&velocity_Out_image.pressure_tex).unwrap();
     let output_tex_view = gpu_images.get(&velocity_Out_image.output_tex).unwrap();
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor {
+    let velocity_sampler = render_device.create_sampler(&SamplerDescriptor {
         address_mode_u: AddressMode::ClampToEdge,
         address_mode_v: AddressMode::ClampToEdge,
         mag_filter: FilterMode::Linear,
         min_filter: FilterMode::Linear,
         ..Default::default()
     });
-
+    let pressure_sampler = render_device.create_sampler(&SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        ..Default::default()
+    });
     let uniforms = VelocityOutUniforms {
         min_value: -250.0,    // 速度最小值
         max_value: 250.0,     // 速度最大值
@@ -124,7 +133,8 @@ fn prepare_bind_group(
                     &velocity_tex_view.texture_view,
                     &pressure_tex_view.texture_view,
                     &output_tex_view.texture_view,
-                    &sampler,
+                    &velocity_sampler,
+                    &pressure_sampler,
                     BindingResource::Buffer(BufferBinding {
                         buffer: &uniform_buffer,
                         offset: 0,
