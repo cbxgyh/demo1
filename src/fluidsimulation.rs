@@ -11,6 +11,7 @@ use bevy::render::render_resource::{LoadOp, Operations, PipelineCache, RenderPas
 use bevy::render::renderer::RenderContext;
 use bevy::render::view::{ExtractedView, ViewTarget};
 use crate::advection::{AdvectionPlugin, DensityAdvectionComputeLabel, DensityAdvectionComputeNode, VelocityAdvectionComputeLabel, VelocityAdvectionComputeNode};
+use crate::clear::{ClearComputeLabel, ClearComputeNode, ClearPlugin};
 use crate::curl::{CurlComputeLabel, CurlComputeNode, CurlPlugin};
 use crate::display::{DisplayLabel, DisplayNode, DisplayPlugin};
 use crate::divergence::{DivergencComputeLabel, DivergenceComputeNode, DivergencePlugin};
@@ -27,6 +28,7 @@ impl Plugin for FluidSimulationPlugin {
             CurlPlugin,
             VorticityPlugin,
             DivergencePlugin,
+            ClearPlugin,
             PressurePlugin,
             VelocityOutPlugin,
             GradientSubtractPlugin,
@@ -59,6 +61,10 @@ impl Plugin for FluidSimulationPlugin {
                 Core2d,
                 DivergencComputeLabel,
             )
+            .add_render_graph_node::<ClearComputeNode>(
+                Core2d,
+                ClearComputeLabel,
+            )
             .add_render_graph_node::<PressureComputeNode>(
                 Core2d,
                 PressureComputeLabel,
@@ -81,6 +87,7 @@ impl Plugin for FluidSimulationPlugin {
                     CurlComputeLabel,
                     VorticityLabel,
                     DivergencComputeLabel,
+                    ClearComputeLabel,
                     PressureComputeLabel,
                     VorticityOutLabel,
                     GradientLabel,

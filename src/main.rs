@@ -11,6 +11,7 @@ mod compute_shader_game_of_life;
 mod universe;
 mod fluidsimulation;
 mod display2;
+mod clear;
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
@@ -40,6 +41,7 @@ use bevy::window::PrimaryWindow;
 use rand::{thread_rng, Rng};
 use rand::seq::SliceRandom;
 use crate::advection::{ AdvectionPipeline, AdvectionPlugin, DensityAdvectionImage, VelocityAdvectionImage};
+use crate::clear::ClearImage;
 use crate::compute_shader_game_of_life::{GameOfLifeComputePlugin, GameOfLifeImage};
 use crate::curl::{CurlBindGroup, CurlImage, CurlPipeline, CurlPlugin};
 use crate::display::DisplayTarget;
@@ -622,6 +624,11 @@ fn  setup(
     });
     commands.insert_resource(DivergenceImage {
         velocity_tex: fluid_textures.velocity.0.clone(),
+        output_tex: fluid_textures.divergence.clone(),
+    });
+    commands.insert_resource(ClearImage {
+        u_texture_tex: fluid_textures.burns.clone(),
+        u_wind_tex: fluid_textures.pressure.0.clone(),
         output_tex: fluid_textures.divergence.clone(),
     });
     // 初始化PressureImage资源

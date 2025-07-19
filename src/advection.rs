@@ -79,6 +79,8 @@ impl FromWorld for AdvectionPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     texture_storage_2d(TextureFormat::Rgba8Unorm, StorageTextureAccess::WriteOnly),
                     sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
+                    sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<AdvectionUniforms>(false)
                 )
         ));
@@ -110,10 +112,13 @@ impl FromWorld for AdvectionPipeline {
 #[derive(Resource, Clone, ExtractResource, AsBindGroup)]
 pub struct VelocityAdvectionImage {
     #[texture(0, visibility(compute))]
+    #[sampler(4)]
     pub(crate) velocity_tex: Handle<Image>,
     #[texture(1, visibility(compute))]
+    #[sampler(5)]
     pub(crate) source_tex: Handle<Image>,
     #[texture(2, visibility(compute))]
+    #[sampler(6)]
     pub(crate) wind_tex: Handle<Image>,
     #[storage_texture(3, image_format = Rgba8Unorm, access = ReadWrite)]
     pub(crate) output_tex: Handle<Image>,
@@ -121,11 +126,15 @@ pub struct VelocityAdvectionImage {
 #[derive(Resource, Clone, ExtractResource, AsBindGroup)]
 pub struct DensityAdvectionImage {
     #[texture(0, visibility(compute))]
+    #[sampler(4)]
     pub(crate) wind_tex: Handle<Image>,
     #[texture(1, visibility(compute))]
+    #[sampler(5)]
     pub(crate) velocity_tex: Handle<Image>,
     #[texture(2, visibility(compute))]
+    #[sampler(6)]
     pub(crate) source_tex: Handle<Image>,
+
     #[storage_texture(3, image_format = Rgba8Unorm, access = ReadWrite)]
     pub(crate) output_tex: Handle<Image>,
 }
@@ -148,13 +157,11 @@ fn prepare_velocity_bind_group(
     let wind_tex_view = gpu_images.get(&advection_image.wind_tex).unwrap();
     let output_tex_view = gpu_images.get(&advection_image.output_tex).unwrap();
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor {
-        address_mode_u: AddressMode::ClampToEdge,
-        address_mode_v: AddressMode::ClampToEdge,
-        mag_filter: FilterMode::Linear,
-        min_filter: FilterMode::Linear,
-        ..Default::default()
-    });
+
+
+    let source_sampler=sampler_create("source_sampler",&render_device);
+    let wind_sampler =sampler_create("wind_sampler ",&render_device);
+    let velocity_sampler =sampler_create("velocity_sampler ",&render_device);
 
     let dt = time.delta_seconds().min(0.016);
     let dissipation = fluid_config.velocity_dissipation;
@@ -178,7 +185,9 @@ fn prepare_velocity_bind_group(
                     &source_tex_view.texture_view,
                     &wind_tex_view.texture_view,
                     &output_tex_view.texture_view,
-                    &sampler,
+                    &velocity_sampler,
+                    &source_sampler,
+                    &wind_sampler,
                     BindingResource::Buffer(BufferBinding {
                         buffer: &uniform_buffer,
                         offset: 0,
@@ -191,6 +200,16 @@ fn prepare_velocity_bind_group(
 
     commands.insert_resource(VelocityAdvectionBindGroup(bind_group));
 
+}
+fn sampler_create(str:&str,render_device:&Res<RenderDevice>) -> Sampler {
+    render_device.create_sampler( &SamplerDescriptor {
+        label: Some(str),
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        ..Default::default()
+    })
 }
 fn prepare_density_bind_group(
     mut commands: Commands,
@@ -207,13 +226,16 @@ fn prepare_density_bind_group(
     let source_view  = gpu_images.get(&advection_image.source_tex).unwrap();
     let output_tex_view = gpu_images.get(&advection_image.output_tex).unwrap();
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor {
-        address_mode_u: AddressMode::ClampToEdge,
-        address_mode_v: AddressMode::ClampToEdge,
-        mag_filter: FilterMode::Linear,
-        min_filter: FilterMode::Linear,
-        ..Default::default()
-    });
+    // let sampler = render_device.create_sampler(&SamplerDescriptor {
+    //     address_mode_u: AddressMode::ClampToEdge,
+    //     address_mode_v: AddressMode::ClampToEdge,
+    //     mag_filter: FilterMode::Linear,
+    //     min_filter: FilterMode::Linear,
+    //     ..Default::default()
+    // });
+    let wind_sampler =sampler_create("wind_sampler ",&render_device);
+    let velocity_sampler  =sampler_create("velocity_sampler  ",&render_device);
+    let source_sampler  =sampler_create("source_sampler  ",&render_device);
 
     let dt = time.delta_seconds().min(0.016);
     let dissipation = fluid_config.velocity_dissipation;
@@ -237,7 +259,9 @@ fn prepare_density_bind_group(
                     &velocity_view.texture_view,
                     &source_view.texture_view,
                     &output_tex_view.texture_view,
-                    &sampler,
+                    &wind_sampler,
+                    &velocity_sampler,
+                    &source_sampler,
                     BindingResource::Buffer(BufferBinding {
                         buffer: &uniform_buffer,
                         offset: 0,
