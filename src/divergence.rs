@@ -80,7 +80,7 @@ impl FromWorld for DivergencePipeline {
 pub struct DivergenceImage{
     #[texture(0, visibility(compute))]
     pub(crate) velocity_tex: Handle<Image>,
-    #[storage_texture(1, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(1, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) output_tex: Handle<Image>,
 }
 

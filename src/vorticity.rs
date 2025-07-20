@@ -60,7 +60,7 @@ pub struct VorticityImage {
     pub(crate) velocity_tex: Handle<Image>,
     #[texture(1, visibility(compute))]
     pub(crate) curl_tex: Handle<Image>,
-    #[storage_texture(2, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(2, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) output_tex: Handle<Image>,
 }
 

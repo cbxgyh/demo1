@@ -9,7 +9,7 @@ use bevy::render::render_graph::{NodeRunError, RenderGraph, RenderGraphContext, 
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use crate::{FluidConfig, FluidTextures, HEIGHT, WIDTH, WORKGROUP_SIZE};
 use crate::universe::CellGrid;
-
+//      速度平流计算 -> 交换速度缓冲区 -> 更新纹理 -> 密度平流计算 -> 交换密度缓冲区
 pub struct AdvectionPlugin;
 impl Plugin for AdvectionPlugin {
     fn build(&self, app: &mut App) {
@@ -17,9 +17,10 @@ impl Plugin for AdvectionPlugin {
         .add_plugins(ExtractResourcePlugin::<DensityAdvectionImage>::default())
             .add_systems(Update,
                          (
-                             update_burns_and_cells_textures,
-                             swap_velocity_buffer.after(update_burns_and_cells_textures),
-                         // check_density_texture.after(swap_velocity_buffer)
+                             swap_buffers, // 在帧开始时交换上一帧的结果
+                             update_burns_and_cells_textures.after(swap_buffers),
+                             swap_velocity_buffer, // 速度平流后的交换
+                             swap_density_buffer,  // 密度平流后的交换
             ));
         ;
         let render_app = app.sub_app_mut(RenderApp);
@@ -120,22 +121,22 @@ pub struct VelocityAdvectionImage {
     #[texture(2, visibility(compute))]
     #[sampler(6)]
     pub(crate) wind_tex: Handle<Image>,
-    #[storage_texture(3, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(3, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) output_tex: Handle<Image>,
 }
 #[derive(Resource, Clone, ExtractResource, AsBindGroup)]
 pub struct DensityAdvectionImage {
     #[texture(0, visibility(compute))]
     #[sampler(4)]
-    pub(crate) wind_tex: Handle<Image>,
+    pub(crate) burns_tex: Handle<Image>,
     #[texture(1, visibility(compute))]
     #[sampler(5)]
     pub(crate) velocity_tex: Handle<Image>,
     #[texture(2, visibility(compute))]
     #[sampler(6)]
-    pub(crate) source_tex: Handle<Image>,
+    pub(crate) density_tex: Handle<Image>,
 
-    #[storage_texture(3, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(3, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) output_tex: Handle<Image>,
 }
 #[derive(Resource)]
@@ -151,7 +152,8 @@ fn prepare_velocity_bind_group(
     advection_pipeline: Res<AdvectionPipeline>,
     time: Res<Time>,
     fluid_config: Res<FluidConfig>,
-) {
+)
+{
     let velocity_tex_view = gpu_images.get(&advection_image.velocity_tex).unwrap();
     let source_tex_view = gpu_images.get(&advection_image.source_tex).unwrap();
     let wind_tex_view = gpu_images.get(&advection_image.wind_tex).unwrap();
@@ -182,12 +184,12 @@ fn prepare_velocity_bind_group(
             (
                 (
                     &velocity_tex_view.texture_view,
-                    &source_tex_view.texture_view,
+                    &velocity_tex_view.texture_view,
                     &wind_tex_view.texture_view,
                     &output_tex_view.texture_view,
-                    &velocity_sampler,
                     &source_sampler,
                     &wind_sampler,
+                    &velocity_sampler,
                     BindingResource::Buffer(BufferBinding {
                         buffer: &uniform_buffer,
                         offset: 0,
@@ -221,9 +223,9 @@ fn prepare_density_bind_group(
     fluid_config: Res<FluidConfig>,
 ) {
 
-    let wind_view  = gpu_images.get(&advection_image.wind_tex).unwrap();
-    let velocity_view = gpu_images.get(&advection_image.velocity_tex).unwrap();
-    let source_view  = gpu_images.get(&advection_image.source_tex).unwrap();
+    let u_wind_view  = gpu_images.get(&advection_image.burns_tex).unwrap();
+    let u_velocity_view = gpu_images.get(&advection_image.velocity_tex).unwrap();
+    let u_source_view  = gpu_images.get(&advection_image.density_tex).unwrap();
     let output_tex_view = gpu_images.get(&advection_image.output_tex).unwrap();
 
     // let sampler = render_device.create_sampler(&SamplerDescriptor {
@@ -255,9 +257,9 @@ fn prepare_density_bind_group(
         &BindGroupEntries::sequential
             (
                 (
-                    &wind_view.texture_view,
-                    &velocity_view.texture_view,
-                    &source_view.texture_view,
+                    &u_wind_view.texture_view,
+                    &u_velocity_view.texture_view,
+                    &u_source_view.texture_view,
                     &output_tex_view.texture_view,
                     &wind_sampler,
                     &velocity_sampler,
@@ -291,6 +293,7 @@ impl render_graph::Node for VelocityAdvectionComputeNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
+        println!("VelocityAdvectionComputeNode run");
         let pipeline_cache = world.resource::<PipelineCache>();
         let advection_pipeline = world.resource::<AdvectionPipeline>();
         let advection_bind_group = world.resource::<VelocityAdvectionBindGroup>();
@@ -316,18 +319,7 @@ impl render_graph::Node for VelocityAdvectionComputeNode {
        Ok(())
     }
 }
-fn swap_velocity_buffer(mut fluid_textures: ResMut<FluidTextures>) {
-    let velocity = &mut fluid_textures.velocity;
-    let prev_front = velocity.0.clone();
-    let prev_back = velocity.1.clone();
 
-    std::mem::swap(&mut velocity.0, &mut velocity.1);
-    // info!("Velocity: {} -> {}, {} -> {}",
-    //     prev_front, fluid_textures.velocity.1,
-    //     prev_back, fluid_textures.velocity.0);
-    let density = &mut fluid_textures.density;
-    std::mem::swap(&mut density.0, &mut density.1);
-}
 
 impl render_graph::Node for DensityAdvectionComputeNode {
     fn run(
@@ -376,6 +368,7 @@ fn update_burns_and_cells_textures(
      // 更新燃烧纹理
     if let Some(image) = images.get_mut(&fluid_textures.burns) {
         let pixels = image.data.as_mut_slice();
+        // println!("update_burns_and_cells_textures:{:?}",pixels.len());
         for (i, wind) in cell_grid.winds.iter().enumerate() {
             let idx = i * 4;
             pixels[idx] = wind.dx;
@@ -434,3 +427,39 @@ pub struct BurnsData(pub Vec<u8>);
 
 #[derive(Resource)]
 pub struct CellsData(pub Vec<u8>);
+// 交换速度缓冲区
+fn swap_velocity_buffer(mut fluid_textures: ResMut<FluidTextures>) {
+    let velocity = &mut fluid_textures.velocity;
+    std::mem::swap(&mut velocity.0, &mut velocity.1);
+    }
+
+// 交换密度缓冲区
+fn swap_density_buffer(mut fluid_textures: ResMut<FluidTextures>) {
+    let density = &mut fluid_textures.density;
+    std::mem::swap(&mut density.0, &mut density.1);
+}
+
+
+
+fn swap_buffers(
+    images: Res<Assets<Image>>,
+    mut fluid_textures: ResMut<FluidTextures>) {
+    {
+        println!("swap_buffers");
+        fluid_textures.log(&images);
+    }
+    {
+        let  velocity = &mut fluid_textures.velocity;
+        std::mem::swap(&mut velocity.0, &mut velocity.1);
+        let density = &mut fluid_textures.density;
+        std::mem::swap(&mut density.0, &mut density.1);
+    }
+    {
+        println!("swap_buffers1");
+        fluid_textures.log(&images);
+    }
+
+
+
+}
+

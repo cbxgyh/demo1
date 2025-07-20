@@ -69,7 +69,7 @@ pub const WORKGROUP_SIZE: u32 = 8;
 
 // 纹理资源
 #[derive(Resource,Default,ExtractResource,Clone)]
-struct FluidTextures {
+pub struct FluidTextures {
     velocity: (Handle<Image>, Handle<Image>),
     density: (Handle<Image>, Handle<Image>),
     pressure: (Handle<Image>, Handle<Image>),
@@ -80,7 +80,60 @@ struct FluidTextures {
     velocity_out: Handle<Image>,
     output: Handle<Image>,
 }
+impl FluidTextures {
+    fn log(&self, images: &Assets<Image>,) {
+        if let Some(image) = images.get(&self.velocity.0) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("velocity 0 texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.velocity.1) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("velocity 1 texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.density.0) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("density 0 texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.density.1) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("density 1 texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.pressure.0) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("pressure 0 texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.pressure.1) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("pressure 1 texture is all zero: {}", is_all_zero);
+        }
 
+        if let Some(image) = images.get(&self.curl) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("curl  texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.divergence) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("divergence   texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.burns) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("burns texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.cells) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("cells texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.velocity_out) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("velocity_out texture is all zero: {}", is_all_zero);
+        }
+        if let Some(image) = images.get(&self.output) {
+            let is_all_zero = image.data.iter().all(|&b| b == 0);
+            info!("output texture is all zero: {}", is_all_zero);
+        }
+
+    }
+}
 // 流体配置参数
 #[derive(Resource,ExtractResource,Clone)]
 struct FluidConfig {
@@ -215,35 +268,6 @@ fn update_texture_data(
 
                     }
                     pixels[idx] = cell.species as u8;
-                    //             //     // let s=Species::random_active() as u8;
-                    //             //     let s=cell.species as u8;
-                    //             //     pixels[idx] = s;
-                    //             //     // pixels[idx + i*4] = s;
-                    //             //     // pixels[idx +  i*8] = s;
-                    //             //     // pixels[idx +  i*12] = s;
-                    //             //     // pixels[idx + 1] = cell.ra;
-                    //             //     // pixels[idx + 2] = cell.rb;
-                    //             //     // pixels[idx + 3] = cell.clock;
-                    //             //     // if cell.species == Species::Fire {
-                    //             //         // let center_x = grid.width / 2;
-                    //             //         // let center_y = grid.height / 2;
-                    //             //         // let idx = (center_y * grid.width + center_x) * 4;
-                    //             //         // println!("Center pixel: {:?}:cell: {:?}", &pixels[idx], cell);
-                    //             //     // }
-                    //             // }
-                    //             // let data_layout = ImageDataLayout {
-                    //             //     offset: 0,
-                    //             //     bytes_per_row: Some(bytes_per_row),
-                    //             //     rows_per_image: None,
-                    //             // };
-                    //             // let data_texture = render_device.create_texture(&image.texture_descriptor);
-                    //             //
-                    //             // render_queue.write_texture(
-                    //             //     data_texture.as_image_copy(),
-                    //             //     &image.data,
-                    //             //     data_layout,
-                    //             //     image.texture_descriptor.size,
-                    //             // );
                 }
             }
         }
@@ -253,71 +277,6 @@ fn update_texture_data(
 struct LastMousePos(Option<Vec2>);
 
 // fn handle_input(
-//     mut grid: ResMut<CellGrid>,
-//     windows: Query<&Window>,
-//     buttons: Res<ButtonInput<MouseButton>>,
-//     mut last_pos: ResMut<LastMousePos>,
-// )
-// {
-//     let window = windows.single();
-//
-//     // 获取当前鼠标位置
-//     let current_pos = if let Some(pos) = window.cursor_position() {
-//         pos
-//     } else {
-//         last_pos.0 = None;
-//         return;
-//     };
-//
-//     // 转换坐标为网格坐标
-//
-//
-//     if buttons.pressed(MouseButton::Left) {
-//         let to_grid_pos = |pos: Vec2| -> (usize, usize) {
-//             let x = (pos.x / window.width() * grid.width as f32) as usize;
-//             let y = grid.height - 1 - (pos.y / window.height() * grid.height as f32) as usize;
-//             (x.clamp(0, grid.width-1), y.clamp(0, grid.height-1))
-//         };
-//         // 如果有上一帧位置，进行插值
-//         if let Some(last) = last_pos.0 {
-//             // 计算两点间距离
-//             let current_grid = to_grid_pos(current_pos);
-//             let last_grid = to_grid_pos(last);
-//
-//             // 使用 Bresenham 算法绘制连续线段
-//             for (x, y) in line_drawing::Bresenham::new(
-//                 (last_grid.0 as i32, last_grid.1 as i32),
-//                 (current_grid.0 as i32, current_grid.1 as i32)
-//             ) {
-//                 let x = x.clamp(0, grid.width as i32 - 1) as usize;
-//                 let y = y.clamp(0, grid.height as i32 - 1) as usize;
-//
-//                 if let Some(cell) = grid.get_mut(x, y) {
-//                     *cell = Cell {
-//                         species: Species::Water,
-//                         ra: 0,
-//                         rb: 0,
-//                         clock: 0,
-//                     };
-//                 }
-//             }
-//         }else{
-//             // 绘制当前点
-//             let (x, y) = to_grid_pos(current_pos);
-//             if let Some(cell) = grid.get_mut(x, y) {
-//                 *cell = Cell {
-//                     species: Species::Water,
-//                     ra: 0,
-//                     rb: 0,
-//                     clock: 0,
-//                 };
-//             }
-//         }
-//     }
-//
-//     // 更新上一帧位置
-//     last_pos.0 = Some(current_pos);
-// }
 
 // 移除原有的render_cells系统，修改handle_input和update_simulation保持不变...
 fn swap_cells(grid: &mut CellGrid, x1: usize, y1: usize, x2: usize, y2: usize) {
@@ -399,7 +358,7 @@ fn apply_seed_positions(
     // cell_grid.winds()
 }
 
-fn  setup(
+pub fn  setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<CellMaterial>>,
@@ -415,7 +374,9 @@ fn  setup(
     // let task_pool = AsyncComputeTaskPool::get();
     let tx2=tx.clone();
     cell_grid.paint(300, 50, 60, Species::Water);
-    cell_grid.paint(550, 50, 60, Species::Fire);
+    cell_grid.paint(450, 50, 60, Species::Fire);
+    cell_grid.paint(550, 550, 60, Species::Lava);
+    cell_grid.paint(550, 300, 60, Species::Dust);
     // 提交异步任务 - 只计算位置，不修改资源
     // let task =  task_pool.spawn(async move {
     std::thread::spawn(move || {
@@ -498,10 +459,14 @@ fn  setup(
     mesh.insert_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3]));
     let quad = meshes.add(mesh);
     fn create_texture(images: &mut Assets<Image>) -> Handle<Image> {
-        let mut image = Image::new_fill(
+        let pixel_count = (WIDTH * HEIGHT) as usize;
+        // 计算数据大小（每个像素 4 字节）
+        let data_size = pixel_count * 4;
+        let initial_data = vec![0u8; data_size];
+        let mut image = Image::new(
             Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 },
             TextureDimension::D2,
-            &[0u8; 4],
+            initial_data,
             TextureFormat::Rgba8Unorm,
             RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
         );
@@ -513,10 +478,14 @@ fn  setup(
 
     // 创建存储纹理的函数
     fn create_storage_texture(images: &mut Assets<Image>) -> Handle<Image> {
-        let mut image = Image::new_fill(
+        let pixel_count = (WIDTH * HEIGHT) as usize;
+        // 计算数据大小（每个像素 4 字节）
+        let data_size = pixel_count * 4;
+        let initial_data = vec![0u8; data_size];
+        let mut image = Image::new(
             Extent3d { width: WIDTH, height: HEIGHT, depth_or_array_layers: 1 },
             TextureDimension::D2,
-            &[0u8; 4],
+            initial_data,
             TextureFormat::Rgba8Unorm,
             RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
         );
@@ -606,18 +575,18 @@ fn  setup(
     // 初始化AdvectionImage资源
     commands.insert_resource(VelocityAdvectionImage {
         velocity_tex: fluid_textures.velocity.0.clone(),
-        source_tex: fluid_textures.density.0.clone(),
+        source_tex: fluid_textures.velocity.0.clone(),
         // 注意：这里使用cells作为风场
-        wind_tex: fluid_textures.cells.clone(),
+        wind_tex: create_texture(&mut images),//fluid_textures.cells.clone(),
         // 输出到速度的写纹理
         output_tex: fluid_textures.velocity.1.clone(),
     });
     commands.insert_resource(DensityAdvectionImage {
         // 使用burns作为风场
-        wind_tex: fluid_textures.burns.clone(),
+        burns_tex: fluid_textures.burns.clone(),
         velocity_tex: fluid_textures.velocity.0.clone(),
         // 使用密度作为源
-        source_tex: fluid_textures.density.0.clone(),
+        density_tex: fluid_textures.density.0.clone(),
         // 输出到密度的写纹理
         output_tex: fluid_textures.density.1.clone(),
     });
@@ -640,7 +609,7 @@ fn  setup(
     commands.insert_resource(ClearImage {
         u_texture_tex: fluid_textures.burns.clone(),
         u_wind_tex: fluid_textures.pressure.0.clone(),
-        output_tex: fluid_textures.divergence.clone(),
+        output_tex: fluid_textures.pressure.1.clone(),
     });
     // 初始化PressureImage资源
     commands.insert_resource(PressureImage {
@@ -657,18 +626,18 @@ fn  setup(
 
     // 初始化GradientSubtractImage资源
     commands.insert_resource(GradientSubtractImage {
-        pressure_tex: fluid_textures.pressure.0.clone(),
-        velocity_tex: fluid_textures.velocity.0.clone(),
-        wind_tex: fluid_textures.burns.clone(),
+        wind_tex: fluid_textures.burns.clone(),          // 风场
+        pressure_tex: fluid_textures.pressure.0.clone(), // 压力
+        velocity_tex: fluid_textures.velocity_out.clone(), // 使用上步输出!
         cells_tex: fluid_textures.cells.clone(),
-        output_tex: fluid_textures.velocity.1.clone(),
+        output_tex: fluid_textures.velocity.1.clone(),   // 写回速度
     });
     // commands.insert_resource(DisplayImage {
     //     density_tex: fluid_textures.density.0.clone(),
     //     output_tex: create_storage_texture(&mut images),
     // });
     commands.insert_resource(DisplayTarget {
-            image: fluid_textures.cells.clone()
+            image: fluid_textures.density.0.clone()
         });
 }
 

@@ -48,7 +48,7 @@ impl Plugin for GameOfLifeComputePlugin {
 
 #[derive(Resource, Clone, Deref, ExtractResource, AsBindGroup)]
 pub struct GameOfLifeImage {
-    #[storage_texture(0, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(0, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) texture: Handle<Image>,
 }
 

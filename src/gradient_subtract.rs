@@ -85,7 +85,7 @@ pub struct GradientSubtractImage {
     #[texture(3, visibility(compute))]
     #[sampler(8)]
     pub(crate) cells_tex: Handle<Image>,
-    #[storage_texture(4, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(4, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) output_tex: Handle<Image>,
 }
 

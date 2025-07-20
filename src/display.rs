@@ -18,15 +18,19 @@ use bevy::{
 use bevy::render::extract_component::ExtractComponentPlugin;
 use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
 use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d};
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use bevy::render::texture::BevyDefault;
+use crate::FluidTextures;
 
 pub struct DisplayPlugin;
 
 impl Plugin for DisplayPlugin {
     fn build(&self, app: &mut App) {
-       app.add_plugins(ExtractResourcePlugin::<DisplayTarget>::default());
+       app.add_plugins(ExtractResourcePlugin::<DisplayTarget>::default())
+           // .add_systems(Update,display_log)
+       ;
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
@@ -41,7 +45,13 @@ impl Plugin for DisplayPlugin {
                 ;
             }
 }
-
+fn display_log(
+    mut fluid_textures: ResMut<FluidTextures>,
+    images: Res<Assets<Image>>,
+){
+    println!("display_log");
+    fluid_textures.log(&images);
+}
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub(crate) struct DisplayLabel;
 
@@ -72,6 +82,7 @@ impl ViewNode for DisplayNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let render_device = world.resource::<RenderDevice>();
         let display_pipeline = world.resource::<DisplayPipeline>();
+
         let Some(pipeline) = pipeline_cache.get_render_pipeline(display_pipeline.pipeline_id) else {
             return Ok(());
         };

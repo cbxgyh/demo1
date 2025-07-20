@@ -59,7 +59,7 @@ pub struct PressureImage {
     #[texture(1, visibility(compute))]
     #[sampler(4)]
     pub(crate) divergence_tex: Handle<Image>,
-    #[storage_texture(2, image_format = Rgba8Unorm, access = ReadWrite)]
+    #[storage_texture(2, image_format = Rgba8Unorm, access = WriteOnly)]
     pub(crate) output_tex: Handle<Image>,
 }
 
